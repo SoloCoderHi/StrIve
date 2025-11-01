@@ -10,6 +10,8 @@
       "**/node_modules/**"
     ],
     "rewrites": [
+      { "source": "/lists/*/import/analyze", "function": "analyzeListImport" },
+      { "source": "/lists/*/import/confirm", "function": "confirmListImport" },
       { "source": "/lists/**", "function": "listsExport" }
     ]
   },

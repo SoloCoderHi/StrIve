@@ -35,7 +35,8 @@ const busboy_1 = __importDefault(require("busboy"));
 if (!admin.apps.length) {
     admin.initializeApp();
 }
-const db = admin.firestore();
+// Firestore instance (used in some legacy paths, kept for compatibility)
+// const db = admin.firestore();
 // Helper function to escape CSV fields that might contain commas, quotes, or newlines
 function escapeCsvField(field) {
     if (field === null || field === undefined) {
@@ -310,38 +311,10 @@ exports.listsExport = functions.https.onRequest(async (req, res) => {
     res.status(200).send(csv);
     return;
 });
-// Mock TMDB API service - in a real implementation, this would call the actual TMDB API
-async function findMovieByTmdbId(tmdbId) {
-    // This is a mock implementation that returns a dummy movie if tmdbId is provided
-    // In a real implementation, this would make a call to the TMDB API
-    if (!tmdbId || isNaN(Number(tmdbId))) {
-        return null;
-    }
-    // Return a mock movie object
-    return {
-        id: parseInt(tmdbId),
-        title: `Mock Movie ${tmdbId}`,
-        release_date: `2020-01-01`,
-        tmdbId: parseInt(tmdbId)
-    };
-}
-async function findMovieByNameAndYear(name, year) {
-    // This is a mock implementation for searching by name and year
-    // In a real implementation, this would make a call to the TMDB API
-    if (!name || !year) {
-        return null;
-    }
-    // Return a mock movie object
-    return {
-        id: 999999,
-        title: name,
-        release_date: `${year}-01-01`,
-        tmdbId: 999999
-    };
-}
 /**
  * Analyzes a CSV file for import to a user's movie list
- * Route: POST /api/lists/{listId}/import/analyze
+ * Route: POST /lists/{listId}/import/analyze
+ * Enforces new CSV schema: tmdbId,imdbId,name,year,mediaType,tmdbRating,imdbRating,tmdbVotes,imdbVotes
  */
 exports.analyzeListImport = functions.https.onRequest(async (req, res) => {
     if (req.method !== 'POST') {
@@ -349,108 +322,191 @@ exports.analyzeListImport = functions.https.onRequest(async (req, res) => {
         return;
     }
     try {
-        const pathParts = req.path.split('/');
+        const pathParts = req.path.split('/').filter(Boolean);
         const listsIndex = pathParts.indexOf('lists');
-        if (listsIndex === -1 || listsIndex + 1 >= pathParts.length) {
-            res.status(400).json({ error: 'List ID is required in URL' });
-            return;
-        }
-        const listId = pathParts[listsIndex + 1];
         const importIndex = pathParts.indexOf('import');
         const analyzeIndex = pathParts.indexOf('analyze');
-        if (importIndex === -1 || analyzeIndex === -1 || analyzeIndex !== importIndex + 1) {
+        if (listsIndex === -1 || importIndex === -1 || analyzeIndex === -1 || analyzeIndex !== importIndex + 1 || listsIndex + 1 >= pathParts.length) {
             res.status(400).json({ error: 'Invalid URL path. Expected /lists/{listId}/import/analyze' });
             return;
         }
-        if (!listId) {
-            res.status(400).json({ error: 'List ID is required' });
-            return;
-        }
+        const listId = pathParts[listsIndex + 1];
         const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!authHeader || !String(authHeader).startsWith('Bearer ')) {
             res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization header' });
             return;
         }
-        const token = authHeader.substring(7);
+        const token = String(authHeader).substring(7);
         let decodedToken;
         try {
             decodedToken = await admin.auth().verifyIdToken(token);
         }
-        catch (error) {
+        catch (_a) {
             res.status(401).json({ error: 'Unauthorized: Invalid token' });
             return;
         }
-        const userId = decodedToken.uid;
-        const listRef = db.collection('users').doc(userId).collection('custom_lists').doc(listId);
-        const listDoc = await listRef.get();
-        if (!listDoc.exists) {
-            res.status(404).json({ error: 'List not found' });
-            return;
+        const uid = decodedToken.uid;
+        let itemsCollectionRef;
+        if (listId === 'watchlist') {
+            itemsCollectionRef = admin.firestore().collection('users').doc(uid).collection('watchlist');
         }
-        const listData = listDoc.data();
-        if (!listData || listData.ownerId !== userId) {
-            res.status(403).json({ error: 'Forbidden: You do not have permission to access this list' });
-            return;
+        else {
+            const listRef = admin.firestore().collection('users').doc(uid).collection('custom_lists').doc(listId);
+            const listDoc = await listRef.get();
+            if (!listDoc.exists) {
+                res.status(404).json({ error: 'List not found' });
+                return;
+            }
+            const listData = listDoc.data();
+            if (!listData || listData.ownerId !== uid) {
+                res.status(403).json({ error: 'Forbidden: You do not have permission to access this list' });
+                return;
+            }
+            itemsCollectionRef = listRef.collection('items');
         }
         const contentType = (req.headers['content-type'] || req.headers['Content-Type']);
         if (!contentType || !contentType.includes('multipart/form-data')) {
             res.status(400).json({ error: 'Content-Type must be multipart/form-data' });
             return;
         }
+        const EXPECTED_HEADERS = ['tmdbId', 'imdbId', 'name', 'year', 'mediaType', 'tmdbRating', 'imdbRating', 'tmdbVotes', 'imdbVotes'];
         const busboy = (0, busboy_1.default)({ headers: req.headers });
         let csvBuffer = null;
-        let csvFieldFound = false;
-        busboy.on('file', (fieldname, file, info) => {
+        let fileCount = 0;
+        busboy.on('file', (_fieldname, file, info) => {
             const { filename, mimeType } = info;
-            if (mimeType === 'text/csv' || filename.endsWith('.csv')) {
+            if (mimeType === 'text/csv' || (filename && filename.endsWith('.csv'))) {
+                fileCount++;
                 const buffers = [];
-                file.on('data', (data) => { buffers.push(data); });
-                file.on('end', () => { csvBuffer = Buffer.concat(buffers); csvFieldFound = true; });
+                file.on('data', (data) => buffers.push(data));
+                file.on('end', () => { csvBuffer = Buffer.concat(buffers); });
             }
             else {
                 file.resume();
             }
         });
         busboy.on('finish', async () => {
-            if (!csvFieldFound || !csvBuffer) {
-                res.status(400).json({ error: 'CSV file is required in the request' });
+            var _a;
+            if (!csvBuffer || fileCount !== 1) {
+                res.status(400).json({ error: 'Exactly one CSV file is required' });
                 return;
             }
             try {
                 const csvString = csvBuffer.toString('utf8');
-                const csvData = Papa.parse(csvString, { header: true, skipEmptyLines: true }).data;
-                if (!Array.isArray(csvData) || csvData.length === 0) {
-                    res.status(400).json({ error: 'CSV file is empty or invalid' });
+                const parsed = Papa.parse(csvString, { header: true, skipEmptyLines: true });
+                const fields = ((_a = parsed === null || parsed === void 0 ? void 0 : parsed.meta) === null || _a === void 0 ? void 0 : _a.fields) || [];
+                if (fields.length !== EXPECTED_HEADERS.length || !fields.every((f, i) => f === EXPECTED_HEADERS[i])) {
+                    if (fields.includes('Letterboxd URI') || fields.includes('Name') || (fields.includes('Year') && !fields.includes('year'))) {
+                        res.status(400).json({ error: 'Legacy CSV headers detected. Expected: ' + EXPECTED_HEADERS.join(',') });
+                        return;
+                    }
+                    res.status(400).json({ error: 'Invalid CSV headers. Expected exact columns: ' + EXPECTED_HEADERS.join(',') });
                     return;
                 }
-                const itemsCollectionRef = db.collection('users').doc(userId).collection('custom_lists').doc(listId).collection('items');
-                const itemsSnapshot = await itemsCollectionRef.get();
-                const existingItems = {};
-                itemsSnapshot.docs.forEach((doc) => { const item = doc.data(); existingItems[item.id] = item; });
-                const result = { matched: [], unmatched: [], duplicates: [] };
-                for (const row of csvData) {
-                    const csvRow = {
-                        tmdbId: row.tmdbId || row['tmdbId'] || '',
-                        Name: row.Name || row['Name'] || '',
-                        Year: row.Year || row['Year'] || '',
-                        'Letterboxd URI': row['Letterboxd URI'] || row['Letterboxd URI'] || ''
-                    };
-                    const isDuplicate = existingItems[csvRow.tmdbId] || Object.values(existingItems).some((item) => item.title === csvRow.Name && item.release_date && new Date(item.release_date).getFullYear().toString() === csvRow.Year);
-                    if (isDuplicate) {
-                        const duplicateMovie = existingItems[csvRow.tmdbId] || Object.values(existingItems).find((item) => item.title === csvRow.Name && item.release_date && new Date(item.release_date).getFullYear().toString() === csvRow.Year);
-                        result.duplicates.push({ movie: { id: duplicateMovie.id, title: duplicateMovie.title, release_date: duplicateMovie.release_date, tmdbId: duplicateMovie.id }, originalRow: csvRow });
-                        continue;
+                const existingSnapshot = await itemsCollectionRef.get();
+                const existingById = new Map();
+                const existingByNameYear = new Set();
+                existingSnapshot.docs.forEach((d) => {
+                    const it = d.data();
+                    if (it === null || it === void 0 ? void 0 : it.id)
+                        existingById.set(String(it.id), it);
+                    const n = ((it === null || it === void 0 ? void 0 : it.title) || (it === null || it === void 0 ? void 0 : it.name) || '').trim();
+                    const y = ((it === null || it === void 0 ? void 0 : it.release_date) || (it === null || it === void 0 ? void 0 : it.first_air_date) || '').slice(0, 4);
+                    if (n && y)
+                        existingByNameYear.add(`${n}::${y}`);
+                });
+                const tmdbApiKey = process.env.TMDB_API_KEY;
+                const limit = pLimit(6);
+                async function tmdbFindByImdb(imdbId, mt) {
+                    if (!tmdbApiKey || !imdbId)
+                        return null;
+                    const url = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?api_key=${tmdbApiKey}&external_source=imdb_id`;
+                    try {
+                        const r = await fetchWithTimeout(url, {}, 8000);
+                        if (!r.ok)
+                            return null;
+                        const j = await r.json();
+                        const arr = mt === 'movie' ? j === null || j === void 0 ? void 0 : j.movie_results : j === null || j === void 0 ? void 0 : j.tv_results;
+                        return Array.isArray(arr) && arr[0] ? arr[0] : null;
                     }
-                    let matchedMovie = null;
-                    if (csvRow.tmdbId && !isNaN(Number(csvRow.tmdbId)))
-                        matchedMovie = await findMovieByTmdbId(csvRow.tmdbId);
-                    if (!matchedMovie && csvRow.Name && csvRow.Year)
-                        matchedMovie = await findMovieByNameAndYear(csvRow.Name, csvRow.Year);
-                    if (matchedMovie)
-                        result.matched.push({ movie: matchedMovie, originalRow: csvRow });
-                    else
-                        result.unmatched.push({ row: csvRow, reason: 'Movie not found in TMDB' });
+                    catch (_a) {
+                        return null;
+                    }
                 }
+                async function tmdbSearchByNameYear(name, year, mt) {
+                    if (!tmdbApiKey || !name)
+                        return null;
+                    const base = `https://api.themoviedb.org/3/search/${mt}`;
+                    const q = new URLSearchParams({ api_key: String(tmdbApiKey), query: name });
+                    if (year)
+                        q.set(mt === 'movie' ? 'year' : 'first_air_date_year', year);
+                    const url = `${base}?${q.toString()}`;
+                    try {
+                        const r = await fetchWithTimeout(url, {}, 8000);
+                        if (!r.ok)
+                            return null;
+                        const j = await r.json();
+                        return Array.isArray(j === null || j === void 0 ? void 0 : j.results) && j.results[0] ? j.results[0] : null;
+                    }
+                    catch (_a) {
+                        return null;
+                    }
+                }
+                async function tmdbDetails(mt, id) {
+                    if (!tmdbApiKey || !id)
+                        return null;
+                    const url = `https://api.themoviedb.org/3/${mt}/${id}?api_key=${tmdbApiKey}`;
+                    try {
+                        const r = await fetchWithTimeout(url, {}, 8000);
+                        if (!r.ok)
+                            return null;
+                        return await r.json();
+                    }
+                    catch (_a) {
+                        return null;
+                    }
+                }
+                const rows = parsed.data;
+                const result = { matched: [], unmatched: [], duplicates: [] };
+                await Promise.all(rows.map((row) => limit(async () => {
+                    const tmdbIdRaw = String(row.tmdbId || '').trim();
+                    const imdbIdRaw = String(row.imdbId || '').trim();
+                    const name = String(row.name || '').trim();
+                    const year = String(row.year || '').trim();
+                    const mt = (String(row.mediaType || '').trim() === 'tv') ? 'tv' : 'movie';
+                    if (tmdbIdRaw && existingById.has(tmdbIdRaw)) {
+                        const it = existingById.get(tmdbIdRaw);
+                        result.duplicates.push({ movie: { id: it.id, title: it.title || it.name, release_date: it.release_date, first_air_date: it.first_air_date, media_type: it.media_type, poster_path: it.poster_path }, originalRow: row });
+                        return;
+                    }
+                    if (!tmdbIdRaw && name && year && existingByNameYear.has(`${name}::${year}`)) {
+                        const it = [...existingById.values()].find((v) => (v.title || v.name) === name && (v.release_date || v.first_air_date || '').startsWith(year));
+                        if (it) {
+                            result.duplicates.push({ movie: { id: it.id, title: it.title || it.name, release_date: it.release_date, first_air_date: it.first_air_date, media_type: it.media_type, poster_path: it.poster_path }, originalRow: row });
+                            return;
+                        }
+                    }
+                    let resolved = null;
+                    if (tmdbIdRaw) {
+                        resolved = await tmdbDetails(mt, tmdbIdRaw);
+                    }
+                    else if (imdbIdRaw) {
+                        const found = await tmdbFindByImdb(imdbIdRaw, mt);
+                        if (found === null || found === void 0 ? void 0 : found.id)
+                            resolved = await tmdbDetails(mt, found.id);
+                    }
+                    else if (name) {
+                        const found = await tmdbSearchByNameYear(name, year, mt);
+                        if (found === null || found === void 0 ? void 0 : found.id)
+                            resolved = await tmdbDetails(mt, found.id);
+                    }
+                    if (resolved === null || resolved === void 0 ? void 0 : resolved.id) {
+                        result.matched.push({ movie: { id: resolved.id, title: resolved.title || resolved.name, release_date: resolved.release_date, first_air_date: resolved.first_air_date, media_type: mt, poster_path: resolved.poster_path }, originalRow: row });
+                    }
+                    else {
+                        result.unmatched.push({ row, reason: 'Not found in TMDB' });
+                    }
+                })));
                 res.status(200).json(result);
                 return;
             }
@@ -470,92 +526,118 @@ exports.analyzeListImport = functions.https.onRequest(async (req, res) => {
 });
 /**
  * Confirms the import of selected movies to a user's movie list
- * Route: POST /api/lists/{listId}/import/confirm
+ * Route: POST /lists/{listId}/import/confirm
+ * Fetches real TMDB details and writes to Firestore with idempotency
  */
 exports.confirmListImport = functions.https.onRequest(async (req, res) => {
+    var _a;
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
         return;
     }
     try {
-        const pathParts = req.path.split('/');
+        const pathParts = req.path.split('/').filter(Boolean);
         const listsIndex = pathParts.indexOf('lists');
-        if (listsIndex === -1 || listsIndex + 1 >= pathParts.length) {
-            res.status(400).json({ error: 'List ID is required in URL' });
-            return;
-        }
-        const listId = pathParts[listsIndex + 1];
         const importIndex = pathParts.indexOf('import');
         const confirmIndex = pathParts.indexOf('confirm');
-        if (importIndex === -1 || confirmIndex === -1 || confirmIndex !== importIndex + 1) {
+        if (listsIndex === -1 || importIndex === -1 || confirmIndex === -1 || confirmIndex !== importIndex + 1 || listsIndex + 1 >= pathParts.length) {
             res.status(400).json({ error: 'Invalid URL path. Expected /lists/{listId}/import/confirm' });
             return;
         }
-        if (!listId) {
-            res.status(400).json({ error: 'List ID is required' });
-            return;
-        }
+        const listId = pathParts[listsIndex + 1];
         const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!authHeader || !String(authHeader).startsWith('Bearer ')) {
             res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization header' });
             return;
         }
-        const token = authHeader.substring(7);
+        const token = String(authHeader).substring(7);
         let decodedToken;
         try {
             decodedToken = await admin.auth().verifyIdToken(token);
         }
-        catch (error) {
+        catch (_b) {
             res.status(401).json({ error: 'Unauthorized: Invalid token' });
             return;
         }
-        const userId = decodedToken.uid;
-        const listRef = db.collection('users').doc(userId).collection('custom_lists').doc(listId);
-        const listDoc = await listRef.get();
-        if (!listDoc.exists) {
-            res.status(404).json({ error: 'List not found' });
-            return;
+        const uid = decodedToken.uid;
+        let itemsCollectionRef;
+        if (listId === 'watchlist') {
+            itemsCollectionRef = admin.firestore().collection('users').doc(uid).collection('watchlist');
         }
-        const listData = listDoc.data();
-        if (!listData || listData.ownerId !== userId) {
-            res.status(403).json({ error: 'Forbidden: You do not have permission to access this list' });
-            return;
+        else {
+            const listRef = admin.firestore().collection('users').doc(uid).collection('custom_lists').doc(listId);
+            const listDoc = await listRef.get();
+            if (!listDoc.exists) {
+                res.status(404).json({ error: 'List not found' });
+                return;
+            }
+            const data = listDoc.data();
+            if (!data || data.ownerId !== uid) {
+                res.status(403).json({ error: 'Forbidden: You do not have permission to access this list' });
+                return;
+            }
+            itemsCollectionRef = listRef.collection('items');
         }
-        const { moviesToImport } = req.body;
-        if (!moviesToImport || !Array.isArray(moviesToImport)) {
+        const { moviesToImport } = req.body || {};
+        if (!Array.isArray(moviesToImport)) {
             res.status(400).json({ error: 'Request body must contain an array of moviesToImport' });
             return;
         }
         if (moviesToImport.length === 0) {
-            res.status(201).json({ success: true, moviesAdded: 0, message: 'No movies to import, but request was processed successfully' });
+            res.status(201).json({ success: true, moviesAdded: 0, message: 'No movies to import' });
             return;
         }
-        const itemsCollectionRef = db.collection('users').doc(userId).collection('custom_lists').doc(listId).collection('items');
-        const itemsSnapshot = await itemsCollectionRef.get();
-        const existingItemIds = new Set();
-        itemsSnapshot.docs.forEach((doc) => { var _a; const item = doc.data(); existingItemIds.add((_a = item.id) === null || _a === void 0 ? void 0 : _a.toString()); });
-        const moviesToActuallyImport = moviesToImport.filter((tmdbId) => !existingItemIds.has(tmdbId.toString()));
-        let moviesAddedCount = 0;
-        const batch = db.batch();
-        for (const tmdbId of moviesToActuallyImport) {
-            const newItemRef = itemsCollectionRef.doc(tmdbId.toString());
-            const movieDetails = await findMovieByTmdbId(tmdbId.toString());
-            if (movieDetails) {
-                const movieData = {
-                    id: movieDetails.tmdbId,
-                    title: movieDetails.title,
-                    release_date: movieDetails.release_date,
-                    dateAdded: admin.firestore.FieldValue.serverTimestamp(),
-                    media_type: 'movie',
-                };
-                batch.set(newItemRef, movieData);
-                moviesAddedCount++;
+        const existingSnapshot = await itemsCollectionRef.get();
+        const existing = new Set(existingSnapshot.docs.map((d) => String((d.data() || {}).id)));
+        const tmdbApiKey = process.env.TMDB_API_KEY;
+        async function fetchDetailsTryBoth(id) {
+            if (!tmdbApiKey)
+                return { ok: false };
+            const mUrl = `https://api.themoviedb.org/3/movie/${id}?api_key=${tmdbApiKey}`;
+            const tUrl = `https://api.themoviedb.org/3/tv/${id}?api_key=${tmdbApiKey}`;
+            try {
+                const r = await fetchWithTimeout(mUrl, {}, 8000);
+                if (r.ok) {
+                    const j = await r.json();
+                    return { ok: true, data: j, media_type: 'movie' };
+                }
             }
+            catch (_a) { }
+            try {
+                const r = await fetchWithTimeout(tUrl, {}, 8000);
+                if (r.ok) {
+                    const j = await r.json();
+                    return { ok: true, data: j, media_type: 'tv' };
+                }
+            }
+            catch (_b) { }
+            return { ok: false };
         }
-        if (moviesAddedCount > 0) {
+        const batch = admin.firestore().batch();
+        let moviesAdded = 0;
+        for (const rawId of moviesToImport) {
+            const id = String(rawId);
+            if (existing.has(id))
+                continue;
+            const det = await fetchDetailsTryBoth(id);
+            if (!det.ok || !((_a = det.data) === null || _a === void 0 ? void 0 : _a.id))
+                continue;
+            const payload = {
+                id: det.data.id,
+                title: det.data.title || det.data.name,
+                poster_path: det.data.poster_path,
+                release_date: det.data.release_date || det.data.first_air_date,
+                vote_average: det.data.vote_average,
+                media_type: det.media_type,
+                dateAdded: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            const docRef = itemsCollectionRef.doc(String(det.data.id));
+            batch.set(docRef, payload, { merge: true });
+            moviesAdded++;
+        }
+        if (moviesAdded > 0)
             await batch.commit();
-        }
-        res.status(201).json({ success: true, moviesAdded: moviesAddedCount, message: `${moviesAddedCount} movies successfully added to the list` });
+        res.status(201).json({ success: true, moviesAdded, message: `${moviesAdded} items successfully added to the list` });
         return;
     }
     catch (error) {

@@ -5,6 +5,9 @@ import useRequireAuth from '../hooks/useRequireAuth';
 import { fetchLists } from '../util/listsSlice';
 import Header from './Header';
 import Footer from './Footer';
+import { getAuth } from 'firebase/auth';
+
+const EXPECTED_HEADERS = ['tmdbId','imdbId','name','year','mediaType','tmdbRating','imdbRating','tmdbVotes','imdbVotes'];
 
 const ImportPage = () => {
   const navigate = useNavigate();
@@ -15,32 +18,50 @@ const ImportPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [headerValid, setHeaderValid] = useState(null);
 
   const { lists, status, error: listsError } = useSelector((state) => state.lists.userLists);
 
-  // Fetch user's lists on component mount
   useEffect(() => {
     if (user) {
       dispatch(fetchLists(user.uid));
     }
   }, [dispatch, user]);
 
-  // Handle file selection
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-        setSelectedFile(file);
-        setError('');
-      } else {
-        setError('Please select a valid CSV file.');
-        setSelectedFile(null);
+    if (!file) return;
+
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      setError('Please select a valid CSV file.');
+      setSelectedFile(null);
+      setHeaderValid(null);
+      return;
+    }
+
+    setSelectedFile(file);
+    setError('');
+
+    // Client-side header validation
+    try {
+      const text = await file.text();
+      const firstLine = text.split('\n')[0].trim();
+      const headers = firstLine.split(',');
+      const valid = headers.length === EXPECTED_HEADERS.length && headers.every((h, i) => h === EXPECTED_HEADERS[i]);
+      setHeaderValid(valid);
+      if (!valid) {
+        if (headers.includes('Letterboxd URI') || headers.includes('Name') || (headers.includes('Year') && !headers.includes('year'))) {
+          setError('Legacy CSV format detected. Please export from the app to get the correct format.');
+        } else {
+          setError(`Invalid CSV headers. Expected: ${EXPECTED_HEADERS.join(',')}`);
+        }
       }
+    } catch (err) {
+      console.error('Error reading file:', err);
+      setHeaderValid(null);
     }
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -54,19 +75,22 @@ const ImportPage = () => {
       return;
     }
 
+    if (headerValid === false) {
+      setError('CSV headers are invalid. Please correct them before proceeding.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      // Get the user's ID token for authentication
-      const token = await user.getIdToken();
+      const auth = getAuth();
+      const token = await auth.currentUser.getIdToken(true);
 
-      // Create FormData to send the file
       const formData = new FormData();
-      formData.append('csvFile', selectedFile);
+      formData.append('file', selectedFile);
 
-      // Make the API call to analyze the CSV
-      const response = await fetch(`/api/lists/${selectedListId}/import/analyze`, {
+      const response = await fetch(`/lists/${encodeURIComponent(selectedListId)}/import/analyze`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -74,14 +98,31 @@ const ImportPage = () => {
         body: formData,
       });
 
+      if (response.status === 401) {
+        setError('Authentication failed. Please log in again.');
+        return;
+      }
+      if (response.status === 403) {
+        setError('You do not have permission to access this list.');
+        return;
+      }
+      if (response.status === 404) {
+        setError('List not found.');
+        return;
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const analysisData = await response.json();
+
+      if (analysisData.matched.length === 0 && analysisData.unmatched.length === 0) {
+        setError('No items found to import. All items are duplicates or the CSV is empty.');
+        return;
+      }
       
-      // Navigate to the review page with the analysis data
       navigate('/import/review', { state: { analysisData, listId: selectedListId } });
     } catch (err) {
       setError(err.message || 'An error occurred while analyzing the CSV file.');
@@ -96,10 +137,20 @@ const ImportPage = () => {
       <Header />
       <main className="flex-grow container mx-auto px-4 py-8 pt-16">
         <div className="max-w-2xl mx-auto bg-gray-900 rounded-xl p-6 shadow-lg">
-          <h1 className="text-3xl font-bold text-white mb-6 text-center">Import CSV to Your Movie List</h1>
+          <h1 className="text-3xl font-bold text-white mb-6 text-center">Import CSV to Your List</h1>
+
+          <div className="mb-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+            <h2 className="text-sm font-semibold text-blue-300 mb-2">Required CSV Format</h2>
+            <p className="text-xs text-gray-300 mb-2">Your CSV must have these exact headers (case-sensitive):</p>
+            <code className="block text-xs bg-gray-800 p-2 rounded text-green-400 overflow-x-auto">
+              {EXPECTED_HEADERS.join(',')}
+            </code>
+            <p className="text-xs text-gray-400 mt-2">
+              Tip: Export a list from this app to get the correct format. Empty values allowed for: imdbId, imdbRating, imdbVotes
+            </p>
+          </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* List selection dropdown */}
             <div>
               <label htmlFor="listSelect" className="block text-sm font-medium text-gray-300 mb-2">
                 Select a List to Import To
@@ -112,6 +163,7 @@ const ImportPage = () => {
                 disabled={status === 'loading'}
               >
                 <option value="">Choose a list...</option>
+                <option value="watchlist">Watchlist</option>
                 {lists && lists.map((list) => (
                   <option key={list.id} value={list.id}>
                     {list.name}
@@ -149,28 +201,35 @@ const ImportPage = () => {
                   </div>
                   <p className="text-xs text-gray-500">CSV files only</p>
                   {selectedFile && (
-                    <p className="text-sm text-green-500">
-                      Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
-                    </p>
+                    <div className="mt-2">
+                      <p className="text-sm text-green-500">
+                        Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+                      </p>
+                      {headerValid === true && (
+                        <p className="text-xs text-green-400 mt-1">✓ Headers validated</p>
+                      )}
+                      {headerValid === false && (
+                        <p className="text-xs text-red-400 mt-1">✗ Invalid headers</p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Error message */}
             {error && (
               <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-300 text-center">
                 {error}
               </div>
             )}
 
-            {/* Submit button */}
             <div className="flex justify-center">
               <button
                 type="submit"
-                disabled={loading || !selectedListId || !selectedFile}
+                disabled={loading || !selectedListId || !selectedFile || headerValid === false}
+                aria-busy={loading}
                 className={`px-6 py-3 rounded-lg text-white font-semibold ${
-                  loading || !selectedListId || !selectedFile
+                  loading || !selectedListId || !selectedFile || headerValid === false
                     ? 'bg-gray-700 cursor-not-allowed'
                     : 'bg-red-600 hover:bg-red-700'
                 }`}

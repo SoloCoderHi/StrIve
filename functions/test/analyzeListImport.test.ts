@@ -3,39 +3,31 @@ import functionsTest from 'firebase-functions-test';
 import { analyzeListImport } from '../index';
 import * as Busboy from 'busboy';
 
-// Initialize Firebase Test SDK
 const test = functionsTest();
 
-// Mock data for testing
 const mockUserId = 'test-user-id';
 const mockListId = 'test-list-id';
-const mockMovieItems = [
-  {
-    id: '123',
-    title: 'Test Movie',
-    release_date: '2022-01-01',
-    poster_path: '/test-poster.jpg',
-    vote_average: 8.5,
-    media_type: 'movie',
-    dateAdded: new Date().toISOString(),
-  },
-  {
-    id: '456',
-    title: 'Another Test Movie',
-    release_date: '2023-05-15',
-    poster_path: '/test-poster2.jpg',
-    vote_average: 7.8,
-    media_type: 'movie',
-    dateAdded: new Date().toISOString(),
-  }
-];
 
-// Sample CSV content
-const sampleCsvContent = `tmdbId,Name,Year,Letterboxd URI
-123,Test Movie,2022,https://letterboxd.com/film/test-movie
-789,New Movie,2023,https://letterboxd.com/film/new-movie`;
+const VALID_HEADERS = 'tmdbId,imdbId,name,year,mediaType,tmdbRating,imdbRating,tmdbVotes,imdbVotes';
+const LEGACY_HEADERS = 'tmdbId,Name,Year,Letterboxd URI';
 
-describe('Analyze List Import Function', () => {
+const validCsvMovie = `${VALID_HEADERS}
+123,,Test Movie,2022,movie,7.5,,100,
+456,,Another Movie,2021,movie,8.1,,200,`;
+
+const validCsvTv = `${VALID_HEADERS}
+789,,Test Show,2020,tv,8.5,,150,`;
+
+const validCsvWithImdb = `${VALID_HEADERS}
+,tt1234567,Movie With IMDb,2019,movie,6.8,,90,`;
+
+const legacyCsv = `${LEGACY_HEADERS}
+123,Test Movie,2022,https://letterboxd.com/film/test`;
+
+const invalidHeadersCsv = `tmdbId,wrong,headers
+123,val1,val2`;
+
+describe('analyzeListImport - Schema Validation', () => {
   let mockAuth: any;
   let mockFirestore: any;
 
@@ -57,19 +49,124 @@ describe('Analyze List Import Function', () => {
     jest.clearAllMocks();
   });
 
-  it('should return 401 if no authorization header is provided', async () => {
-    const req = {
-      method: 'POST',
-      path: `/lists/${mockListId}/import/analyze`,
-      headers: {},
+  it('rejects legacy CSV headers (Letterboxd URI, Name, Year)', async () => {
+    const req = makeReq(mockListId, legacyCsv);
+    const res = makeRes();
+    mockAuthValid();
+    mockFirestoreCustomList(mockListId, mockUserId);
+
+    const busboy = {
+      on: jest.fn((event, callback) => {
+        if (event === 'file') {
+          const mockFile = {
+            on: jest.fn((subEvent, subCallback) => {
+              if (subEvent === 'data') subCallback(Buffer.from(legacyCsv));
+              else if (subEvent === 'end') subCallback();
+              return mockFile;
+            }),
+            resume: jest.fn(),
+          };
+          callback('file', mockFile, { filename: 'legacy.csv', mimeType: 'text/csv' });
+        } else if (event === 'finish') {
+          setImmediate(callback);
+        }
+        return busboy;
+      }),
     };
-    
-    const res = { 
-      status: jest.fn(() => res), 
-      json: jest.fn(),
-      set: jest.fn(() => res),
-      send: jest.fn()
+    (req as any).pipe = jest.fn().mockImplementation(() => {
+      busboy.on('file', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'file')[1]);
+      busboy.on('finish', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'finish')[1]);
+    });
+
+    await analyzeListImport(req as any, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: expect.stringContaining('Legacy CSV headers detected'),
+    }));
+  });
+
+  it('rejects invalid CSV headers (wrong column names)', async () => {
+    const req = makeReq(mockListId, invalidHeadersCsv);
+    const res = makeRes();
+    mockAuthValid();
+    mockFirestoreCustomList(mockListId, mockUserId);
+
+    const busboy = {
+      on: jest.fn((event, callback) => {
+        if (event === 'file') {
+          const mockFile = {
+            on: jest.fn((subEvent, subCallback) => {
+              if (subEvent === 'data') subCallback(Buffer.from(invalidHeadersCsv));
+              else if (subEvent === 'end') subCallback();
+              return mockFile;
+            }),
+            resume: jest.fn(),
+          };
+          callback('file', mockFile, { filename: 'invalid.csv', mimeType: 'text/csv' });
+        } else if (event === 'finish') {
+          setImmediate(callback);
+        }
+        return busboy;
+      }),
     };
+    (req as any).pipe = jest.fn().mockImplementation(() => {
+      busboy.on('file', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'file')[1]);
+      busboy.on('finish', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'finish')[1]);
+    });
+
+    await analyzeListImport(req as any, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: expect.stringContaining('Invalid CSV headers'),
+    }));
+  });
+
+  it('accepts valid CSV with exact headers', async () => {
+    const req = makeReq(mockListId, validCsvMovie);
+    const res = makeRes();
+    mockAuthValid();
+    mockFirestoreCustomList(mockListId, mockUserId);
+    delete process.env.TMDB_API_KEY;
+
+    const busboy = {
+      on: jest.fn((event, callback) => {
+        if (event === 'file') {
+          const mockFile = {
+            on: jest.fn((subEvent, subCallback) => {
+              if (subEvent === 'data') subCallback(Buffer.from(validCsvMovie));
+              else if (subEvent === 'end') subCallback();
+              return mockFile;
+            }),
+            resume: jest.fn(),
+          };
+          callback('file', mockFile, { filename: 'valid.csv', mimeType: 'text/csv' });
+        } else if (event === 'finish') {
+          setImmediate(callback);
+        }
+        return busboy;
+      }),
+    };
+    (req as any).pipe = jest.fn().mockImplementation(() => {
+      busboy.on('file', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'file')[1]);
+      busboy.on('finish', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'finish')[1]);
+    });
+
+    await analyzeListImport(req as any, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      matched: expect.any(Array),
+      unmatched: expect.any(Array),
+      duplicates: expect.any(Array),
+    }));
+  });
+
+  it('returns 401 if no authorization header is provided', async () => {
+    const req = makeReq(mockListId, validCsvMovie, '');
+    (req as any).headers.authorization = undefined;
+    const res = makeRes();
 
     await analyzeListImport(req as any, res as any);
 
@@ -77,36 +174,18 @@ describe('Analyze List Import Function', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized: Missing or invalid authorization header' });
   });
 
-  it('should return 401 if invalid token is provided', async () => {
-    const req = {
-      method: 'POST',
-      path: `/lists/${mockListId}/import/analyze`,
-      headers: {
-        authorization: 'Bearer invalid-token',
-      },
-    };
-    
-    const res = { 
-      status: jest.fn(() => res), 
-      json: jest.fn(),
-      set: jest.fn(() => res),
-      send: jest.fn()
-    };
-
-    // Mock auth verification to fail
-    const mockVerifyIdToken = jest.fn().mockRejectedValue(new Error('Invalid token'));
-    mockAuth.mockReturnValue({
-      verifyIdToken: mockVerifyIdToken,
-    });
+  it('returns 401 if invalid token is provided', async () => {
+    const req = makeReq(mockListId, validCsvMovie, 'bad-token');
+    const res = makeRes();
+    mockAuthInvalid();
 
     await analyzeListImport(req as any, res as any);
 
-    expect(mockVerifyIdToken).toHaveBeenCalledWith('invalid-token');
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized: Invalid token' });
   });
 
-  it('should return 404 if list does not exist', async () => {
+  it('returns 404 if custom list does not exist', async () => {
     const req = {
       method: 'POST',
       path: `/lists/${mockListId}/import/analyze`,
@@ -145,7 +224,7 @@ describe('Analyze List Import Function', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'List not found' });
   });
 
-  it('should return 403 if user does not own the list', async () => {
+  it('returns 403 if user does not own the custom list', async () => {
     const req = {
       method: 'POST',
       path: `/lists/${mockListId}/import/analyze`,
@@ -187,7 +266,7 @@ describe('Analyze List Import Function', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Forbidden: You do not have permission to access this list' });
   });
 
-  it('should return 400 if content type is not multipart/form-data', async () => {
+  it('returns 400 if content type is not multipart/form-data', async () => {
     const req = {
       method: 'POST',
       path: `/lists/${mockListId}/import/analyze`,
@@ -257,9 +336,86 @@ describe('Analyze List Import Function', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Content-Type must be multipart/form-data' });
   });
 
-  it('should return analysis results when CSV is valid', async () => {
-    // This test is more complex due to Busboy parsing
-    // We'll test the response after the file is processed
+  it('supports watchlist as target (listId=watchlist)', async () => {
+    const req = makeReq('watchlist', validCsvMovie);
+    const res = makeRes();
+    mockAuthValid();
+    mockFirestoreWatchlist();
+    delete process.env.TMDB_API_KEY;
+
+    const busboy = {
+      on: jest.fn((event, callback) => {
+        if (event === 'file') {
+          const mockFile = {
+            on: jest.fn((subEvent, subCallback) => {
+              if (subEvent === 'data') subCallback(Buffer.from(validCsvMovie));
+              else if (subEvent === 'end') subCallback();
+              return mockFile;
+            }),
+            resume: jest.fn(),
+          };
+          callback('file', mockFile, { filename: 'watchlist.csv', mimeType: 'text/csv' });
+        } else if (event === 'finish') {
+          setImmediate(callback);
+        }
+        return busboy;
+      }),
+    };
+    (req as any).pipe = jest.fn().mockImplementation(() => {
+      busboy.on('file', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'file')[1]);
+      busboy.on('finish', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'finish')[1]);
+    });
+
+    await analyzeListImport(req as any, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      matched: expect.any(Array),
+      unmatched: expect.any(Array),
+      duplicates: expect.any(Array),
+    }));
+  });
+
+  it('detects duplicates by tmdbId in target list', async () => {
+    const existingItem = { id: '123', title: 'Test Movie', release_date: '2022-01-01', media_type: 'movie' };
+    const req = makeReq(mockListId, validCsvMovie);
+    const res = makeRes();
+    mockAuthValid();
+    mockFirestoreCustomList(mockListId, mockUserId, [existingItem]);
+    delete process.env.TMDB_API_KEY;
+
+    const busboy = {
+      on: jest.fn((event, callback) => {
+        if (event === 'file') {
+          const mockFile = {
+            on: jest.fn((subEvent, subCallback) => {
+              if (subEvent === 'data') subCallback(Buffer.from(validCsvMovie));
+              else if (subEvent === 'end') subCallback();
+              return mockFile;
+            }),
+            resume: jest.fn(),
+          };
+          callback('file', mockFile, { filename: 'dup.csv', mimeType: 'text/csv' });
+        } else if (event === 'finish') {
+          setImmediate(callback);
+        }
+        return busboy;
+      }),
+    };
+    (req as any).pipe = jest.fn().mockImplementation(() => {
+      busboy.on('file', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'file')[1]);
+      busboy.on('finish', (busboy as any).on.mock.calls.find((c: any) => c[0] === 'finish')[1]);
+    });
+
+    await analyzeListImport(req as any, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const result = res.json.mock.calls[0][0];
+    expect(result.duplicates.length).toBeGreaterThan(0);
+    expect(result.duplicates.some((d: any) => d.movie.id === 123 || d.movie.id === '123')).toBe(true);
+  });
+
+  it('returns analysis results when CSV is valid', async () => {
     const mockBusboy = {
       on: jest.fn((event, callback) => {
         if (event === 'file') {
@@ -371,7 +527,7 @@ describe('Analyze List Import Function', () => {
     expect(mockPipe).toHaveBeenCalledWith(req);
   });
 
-  it('should return 400 if CSV file is empty or invalid', async () => {
+  it('returns 400 if CSV file is empty or invalid', async () => {
     const mockBusboy = {
       on: jest.fn((event, callback) => {
         if (event === 'finish') {

@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/test/exportListToCsv.test.ts'],
+  testMatch: ['**/test/**/*.test.ts'],
   globals: { 'ts-jest': { diagnostics: false } },
   collectCoverageFrom: [
     '**/*.ts',

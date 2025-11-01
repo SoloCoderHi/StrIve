@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import useRequireAuth from '../hooks/useRequireAuth';
 import { fetchActiveList, removeItem } from '../util/listsSlice';
 import MovieCard from './MovieCard';
@@ -13,13 +13,25 @@ const ListDetailsPage = () => {
   const dispatch = useDispatch();
   const user = useRequireAuth();
   const { listId } = useParams();
+  const location = useLocation();
   const { details, items, status, error } = useSelector((state) => state.lists.activeList);
+  const [successMessage, setSuccessMessage] = React.useState(null);
 
   useEffect(() => {
     if (user && listId) {
       dispatch(fetchActiveList({ userId: user.uid, listId }));
     }
   }, [dispatch, user, listId]);
+
+  useEffect(() => {
+    if (location.state?.importSuccess) {
+      const count = location.state.importSuccess;
+      const msg = location.state.message || `${count} items successfully imported`;
+      setSuccessMessage(msg);
+      const timer = setTimeout(() => setSuccessMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   const handleRemoveItem = async (item) => {
     if (user && listId) {
@@ -49,6 +61,12 @@ const ListDetailsPage = () => {
         {status === 'loading' && <div className="text-center">Loading list details...</div>}
         
         {error && <div className="text-center text-red-500">Error: {error}</div>}
+
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-900/50 border border-green-700 rounded-lg text-green-300 text-center">
+            {successMessage}
+          </div>
+        )}
         
         {status !== 'loading' && !error && details && (
           <div>

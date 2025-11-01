@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useLocation } from "react-router-dom";
 import { fetchWatchlist, removeItemFromWatchlist } from "../util/listsSlice";
 import Header from "./Header";
 import MovieCard from "./MovieCard";
 import FilterControls from "./FilterControls";
 import ConfirmationModal from "./ConfirmationModal";
-import React from 'react';
 
 const WatchlistExportButton = () => {
   const [loading, setLoading] = React.useState(false);
@@ -35,18 +35,30 @@ const MyListPage = () => {
   const dispatch = useDispatch();
   const user = useSelector((store) => store.user.user);
   const { items: watchlistItems, status: watchlistStatus, error: watchlistError } = useSelector((store) => store.lists.watchlist);
+  const location = useLocation();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [itemToRemove, setItemToRemove] = useState(null);
   const [shouldSkipConfirm, setShouldSkipConfirm] = useState(() => 
     localStorage.getItem("skipRemoveConfirmation") === "true"
   );
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     if (user) {
       dispatch(fetchWatchlist(user.uid));
     }
   }, [dispatch, user]);
+
+  useEffect(() => {
+    if (location.state?.importSuccess) {
+      const count = location.state.importSuccess;
+      const msg = location.state.message || `${count} items successfully imported`;
+      setSuccessMessage(msg);
+      const timer = setTimeout(() => setSuccessMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   const handleRemoveClick = (item) => {
     if (shouldSkipConfirm) {
@@ -92,6 +104,13 @@ const MyListPage = () => {
           <h1 className="text-3xl font-bold">My List</h1>
           <WatchlistExportButton />
         </div>
+
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-900/50 border border-green-700 rounded-lg text-green-300 text-center">
+            {successMessage}
+          </div>
+        )}
+
         {watchlistStatus === "succeeded" && watchlistItems.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-lg">Your list is empty. Add some movies and shows to get started!</p>

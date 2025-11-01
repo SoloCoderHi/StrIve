@@ -5,6 +5,7 @@ import Header from './Header';
 import Footer from './Footer';
 import ImportMovieItem from './ImportMovieItem';
 import ManualSearchModal from './ManualSearchModal';
+import { getAuth } from 'firebase/auth';
 
 const ImportReview = () => {
   const location = useLocation();
@@ -96,18 +97,19 @@ const ImportReview = () => {
     setError('');
 
     try {
-      // Get the user's ID token for authentication
-      const token = await user.getIdToken();
+      const auth = getAuth();
+      const token = await auth.currentUser.getIdToken(true);
 
       // Collect all movie IDs to import (from matched items and resolved unmatched items)
       // For matched items: use the tmdbId
-      const matchedMovieIds = localAnalysisData.matched.map(item => item.movie.tmdbId.toString());
-      
-      // Combine all movie IDs to import
-      const moviesToImport = [...matchedMovieIds];
+      const moviesToImport = localAnalysisData.matched.map(item => String(item.movie.id || item.movie.tmdbId));
 
-      // Make the API call to confirm import
-      const response = await fetch(`/api/lists/${listId}/import/confirm`, {
+      if (moviesToImport.length === 0) {
+        setError('No items to import.');
+        return;
+      }
+
+      const response = await fetch(`/lists/${encodeURIComponent(listId)}/import/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,15 +118,28 @@ const ImportReview = () => {
         body: JSON.stringify({ moviesToImport }),
       });
 
+      if (response.status === 401) {
+        setError('Authentication failed. Please log in again.');
+        return;
+      }
+      if (response.status === 403) {
+        setError('You do not have permission to access this list.');
+        return;
+      }
+      if (response.status === 404) {
+        setError('List not found.');
+        return;
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
       
-      // Navigate to success page or back to the list
-      navigate(`/my-lists/${listId}`, { state: { importSuccess: result.moviesAdded } });
+      const destination = listId === 'watchlist' ? '/my-list' : `/my-lists/${listId}`;
+      navigate(destination, { state: { importSuccess: result.moviesAdded, message: result.message } });
     } catch (err) {
       setError(err.message || 'An error occurred while confirming the import.');
       console.error('Import confirmation error:', err);
@@ -208,8 +223,8 @@ const ImportReview = () => {
                   {localAnalysisData.unmatched.map((item, index) => (
                     <div key={`unmatched-${index}`} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
                       <div>
-                        <p className="text-white font-medium">{item.row.Name}</p>
-                        <p className="text-gray-400 text-sm">{item.row.Year}</p>
+                        <p className="text-white font-medium">{item.row.name || item.row.Name}</p>
+                        <p className="text-gray-400 text-sm">{item.row.year || item.row.Year} • {item.row.mediaType || 'movie'}</p>
                       </div>
                       <div className="flex space-x-2">
                         <button 
@@ -298,8 +313,8 @@ const ImportReview = () => {
         <ManualSearchModal
           isOpen={searchModal.isOpen}
           onClose={() => setSearchModal({ isOpen: false, item: null, index: null })}
-          initialQuery={searchModal.item?.row?.Name || ''}
-          year={searchModal.item?.row?.Year}
+          initialQuery={searchModal.item?.row?.name || searchModal.item?.row?.Name || ''}
+          year={searchModal.item?.row?.year || searchModal.item?.row?.Year}
           onSelectMovie={handleSelectMovie}
           onCancel={() => setSearchModal({ isOpen: false, item: null, index: null })}
         />
