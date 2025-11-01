@@ -17,7 +17,31 @@ export const fetchWatchlist = createAsyncThunk(
     try {
       const watchlist = await getList(userId, "watchlist");
       // Return the watchlist with limited items for preview (first 10)
-      return watchlist.slice(0, 10);
+      
+      // Convert Firestore Timestamps to serializable format before returning
+      const processedWatchlist = (watchlist.slice(0, 10) || []).map(item => {
+        // Create a copy of the item to avoid mutating the original
+        const processedItem = { ...item };
+        
+        // Convert dateAdded Timestamp to ISO string if it exists
+        if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
+          processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+        }
+        
+        // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
+        if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
+          processedItem.release_date = processedItem.release_date.toDate().toISOString();
+        }
+        
+        // Convert any other Timestamp fields if they exist
+        if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
+          processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+        }
+        
+        return processedItem;
+      });
+      
+      return processedWatchlist;
     } catch (error) {
       return rejectWithValue(error.toString());
     }
@@ -42,7 +66,44 @@ export const fetchLists = createAsyncThunk(
   async (userId, { rejectWithValue }) => {
     try {
       const lists = await fetchUserListsWithPreviews(userId);
-      return lists;
+      
+      // Convert Firestore Timestamps to serializable format before returning
+      return lists.map(list => {
+        // Process the list details
+        const processedList = { ...list };
+        
+        // If the list has a createdAt Timestamp, convert it to ISO string
+        if (processedList.createdAt && typeof processedList.createdAt.toDate === 'function') {
+          processedList.createdAt = processedList.createdAt.toDate().toISOString();
+        }
+        
+        // Process items in the list if they exist
+        if (processedList.items && Array.isArray(processedList.items)) {
+          processedList.items = processedList.items.map(item => {
+            // Create a copy of the item to avoid mutating the original
+            const processedItem = { ...item };
+            
+            // Convert dateAdded Timestamp to ISO string if it exists
+            if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
+              processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+            }
+            
+            // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
+            if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
+              processedItem.release_date = processedItem.release_date.toDate().toISOString();
+            }
+            
+            // Convert any other Timestamp fields if they exist
+            if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
+              processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+            }
+            
+            return processedItem;
+          });
+        }
+        
+        return processedList;
+      });
     } catch (error) {
       return rejectWithValue(error.toString());
     }
@@ -103,6 +164,37 @@ export const fetchActiveList = createAsyncThunk(
   async ({ userId, listId }, { rejectWithValue }) => {
     try {
       const listData = await fetchListWithItems(userId, listId);
+      
+      // Convert Firestore Timestamps to serializable format before returning
+      if (listData && listData.items && Array.isArray(listData.items)) {
+        listData.items = listData.items.map(item => {
+          // Create a copy of the item to avoid mutating the original
+          const processedItem = { ...item };
+          
+          // Convert dateAdded Timestamp to ISO string if it exists
+          if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
+            processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+          }
+          
+          // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
+          if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
+            processedItem.release_date = processedItem.release_date.toDate().toISOString();
+          }
+          
+          // Convert any other Timestamp fields if they exist
+          if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
+            processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+          }
+          
+          return processedItem;
+        });
+      }
+      
+      // Also convert list-level Timestamps
+      if (listData && listData.createdAt && typeof listData.createdAt.toDate === 'function') {
+        listData.createdAt = listData.createdAt.toDate().toISOString();
+      }
+      
       return listData;
     } catch (error) {
       return rejectWithValue(error.toString());
@@ -126,7 +218,28 @@ const listsSlice = createSlice({
       })
       .addCase(fetchWatchlist.fulfilled, (state, action) => {
         state.watchlist.status = "succeeded";
-        state.watchlist.items = action.payload;
+        // Convert any Timestamps in the items to serializable format
+        state.watchlist.items = (action.payload || []).map(item => {
+          // Create a copy of the item to avoid mutating the original
+          const processedItem = { ...item };
+          
+          // Convert dateAdded Timestamp to ISO string if it exists
+          if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
+            processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+          }
+          
+          // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
+          if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
+            processedItem.release_date = processedItem.release_date.toDate().toISOString();
+          }
+          
+          // Convert any other Timestamp fields if they exist
+          if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
+            processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+          }
+          
+          return processedItem;
+        });
       })
       .addCase(fetchWatchlist.rejected, (state, action) => {
         state.watchlist.status = "failed";
@@ -154,14 +267,40 @@ const listsSlice = createSlice({
         state.customLists.status = "succeeded";
         // Convert Firestore Timestamps to serializable format
         state.customLists.lists = action.payload.map(list => {
+          // Process the list details
+          const processedList = { ...list };
+          
           // If the list has a createdAt Timestamp, convert it to ISO string
-          if (list.createdAt && typeof list.createdAt.toDate === 'function') {
-            return {
-              ...list,
-              createdAt: list.createdAt.toDate().toISOString()
-            };
+          if (processedList.createdAt && typeof processedList.createdAt.toDate === 'function') {
+            processedList.createdAt = processedList.createdAt.toDate().toISOString();
           }
-          return list;
+          
+          // Process items in the list if they exist
+          if (processedList.items && Array.isArray(processedList.items)) {
+            processedList.items = processedList.items.map(item => {
+              // Create a copy of the item to avoid mutating the original
+              const processedItem = { ...item };
+              
+              // Convert dateAdded Timestamp to ISO string if it exists
+              if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
+                processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+              }
+              
+              // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
+              if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
+                processedItem.release_date = processedItem.release_date.toDate().toISOString();
+              }
+              
+              // Convert any other Timestamp fields if they exist
+              if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
+                processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+              }
+              
+              return processedItem;
+            });
+          }
+          
+          return processedList;
         });
       })
       .addCase(fetchLists.rejected, (state, action) => {
@@ -241,13 +380,25 @@ const listsSlice = createSlice({
         state.activeList.details = listDetails;
         // Convert any Timestamps in the items to serializable format
         state.activeList.items = (action.payload.items || []).map(item => {
-          if (item.dateAdded && typeof item.dateAdded.toDate === 'function') {
-            return {
-              ...item,
-              dateAdded: item.dateAdded.toDate().toISOString()
-            };
+          // Create a copy of the item to avoid mutating the original
+          const processedItem = { ...item };
+          
+          // Convert dateAdded Timestamp to ISO string if it exists
+          if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
+            processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
           }
-          return item;
+          
+          // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
+          if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
+            processedItem.release_date = processedItem.release_date.toDate().toISOString();
+          }
+          
+          // Convert any other Timestamp fields if they exist
+          if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
+            processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+          }
+          
+          return processedItem;
         });
         state.activeList.error = null;
       })

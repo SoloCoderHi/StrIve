@@ -7,7 +7,7 @@ import MovieCard from './MovieCard';
 import FilterControls from './FilterControls';
 import Header from './Header';
 import Footer from './Footer';
-import { getAuth } from 'firebase/auth';
+import { exportListCsv } from '../util/exportDownload';
 
 const ListDetailsPage = () => {
   const dispatch = useDispatch();
@@ -31,59 +31,14 @@ const ListDetailsPage = () => {
     }
   };
 
-  // Export functionality
+  const [exporting, setExporting] = React.useState(false);
   const handleExport = useCallback(async () => {
-    if (!user || !listId) {
-      console.error('User not authenticated or list ID missing');
-      return;
-    }
-
+    if (!user || !listId) return;
     try {
-      // Get the current user's ID token for authentication
-      const auth = getAuth();
-      const token = await auth.currentUser.getIdToken();
-
-      // Use relative path for export endpoint
-      // This will work if Firebase Hosting is configured to rewrite /api/* to functions
-      const response = await fetch(`/lists/${listId}/export`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Export failed with status: ${response.status}`);
-      }
-
-      // Get the response as blob
-      const blob = await response.blob();
-
-      // Create a temporary link to trigger download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Construct filename using list name
-      const fileName = details?.name 
-        ? `${details.name.replace(/\s+/g, '_')}-letswatchu-export.csv`
-        : `list-${listId}-letswatchu-export.csv`;
-      
-      link.setAttribute('download', fileName);
-      
-      // Append to document, click, and remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up the object URL
-      window.URL.revokeObjectURL(url);
-
-      // Optional: Show success notification
-      console.log('List exported successfully');
-    } catch (error) {
-      console.error('Failed to export list:', error);
-      alert(`Failed to export list: ${error.message}`);
+      setExporting(true);
+      await exportListCsv(listId, details?.name);
+    } finally {
+      setExporting(false);
     }
   }, [user, listId, details]);
 
@@ -101,7 +56,9 @@ const ListDetailsPage = () => {
               <h1 className="text-3xl font-bold">{details.name}</h1>
               <button
                 onClick={handleExport}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2"
+                disabled={exporting}
+                aria-busy={exporting}
+                className={`px-4 py-2 ${exporting ? 'bg-green-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white rounded-lg text-sm font-semibold flex items-center gap-2`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-download">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>

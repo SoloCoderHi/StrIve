@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
-import * as functionsTest from 'firebase-functions-test';
-import { confirmListImport } from './index';
+import functionsTest from 'firebase-functions-test';
+import { confirmListImport } from '../index';
 
 // Initialize Firebase Test SDK
 const test = functionsTest();

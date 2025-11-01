@@ -5,6 +5,31 @@ import Header from "./Header";
 import MovieCard from "./MovieCard";
 import FilterControls from "./FilterControls";
 import ConfirmationModal from "./ConfirmationModal";
+import React from 'react';
+
+const WatchlistExportButton = () => {
+  const [loading, setLoading] = React.useState(false);
+  const onClick = async () => {
+    try {
+      setLoading(true);
+      const { exportListCsv } = await import('../util/exportDownload');
+      await exportListCsv('watchlist', 'Watchlist');
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      aria-busy={loading}
+      aria-label="Export watchlist as CSV"
+      className={`px-4 py-2 ${loading ? 'bg-blue-800 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg text-sm font-semibold flex items-center gap-2`}
+    >
+      Export as CSV
+    </button>
+  );
+};
 
 const MyListPage = () => {
   const dispatch = useDispatch();
@@ -63,7 +88,10 @@ const MyListPage = () => {
     <div className="bg-black min-h-screen text-white">
       <Header />
       <div className="pt-24 px-4 md:px-8 lg:px-12">
-        <h1 className="text-3xl font-bold mb-6">My List</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">My List</h1>
+          <WatchlistExportButton />
+        </div>
         {watchlistStatus === "succeeded" && watchlistItems.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-lg">Your list is empty. Add some movies and shows to get started!</p>

@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
-import * as functionsTest from 'firebase-functions-test';
-import { analyzeListImport } from './index';
+import functionsTest from 'firebase-functions-test';
+import { analyzeListImport } from '../index';
 import * as Busboy from 'busboy';
 
 // Initialize Firebase Test SDK

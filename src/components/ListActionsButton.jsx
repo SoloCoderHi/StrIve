@@ -39,56 +39,9 @@ const ListActionsButton = ({ mediaItem, listId, listDetails }) => {
 
   // Export functionality for list (when listId is provided)
   const handleExport = useCallback(async () => {
-    if (!user || !listId) {
-      console.error('User not authenticated or list ID missing');
-      return;
-    }
-
-    try {
-      // Get the current user's ID token for authentication
-      const auth = getAuth();
-      const token = await auth.currentUser.getIdToken();
-
-      // Make request to export endpoint
-      const response = await fetch(`/api/lists/${listId}/export`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Export failed with status: ${response.status}`);
-      }
-
-      // Get the response as blob
-      const blob = await response.blob();
-
-      // Create a temporary link to trigger download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Construct filename using list name
-      const fileName = listDetails?.name 
-        ? `${listDetails.name.replace(/\s+/g, '_')}-letswatchu-export.csv`
-        : `list-${listId}-letswatchu-export.csv`;
-      
-      link.setAttribute('download', fileName);
-      
-      // Append to document, click, and remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up the object URL
-      window.URL.revokeObjectURL(url);
-
-      console.log('List exported successfully');
-    } catch (error) {
-      console.error('Failed to export list:', error);
-      alert(`Failed to export list: ${error.message}`);
-    }
+    if (!user || !listId) return;
+    const { exportListCsv } = await import('../util/exportDownload');
+    await exportListCsv(listId, listDetails?.name);
   }, [user, listId, listDetails]);
 
   const isInAnyList = Object.values(memberships).some((status) => status);
