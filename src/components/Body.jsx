@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import Browse from "./Browse";
 import Login from "./Login";
 import TVShows from "./TVShows";
@@ -11,7 +11,6 @@ import ProtectedRoute from "./ProtectedRoute";
 import MyListPage from "./MyListPage"; // Import MyListPage
 import MyListsPage from "./MyListsPage"; // Import MyListsPage
 import ListDetailsPage from "./ListDetailsPage"; // Import ListDetailsPage
-import ImportPage from "./ImportPage"; // Import ImportPage
 import ImportReviewPage from "./ImportReviewPage"; // Import ImportReviewPage
 import { RouterProvider } from "react-router-dom";
 import Footer from "./Footer";
@@ -75,12 +74,8 @@ const Body = () => {
       ),
     },
     {
-      path: "/import", // Add new route for import page
-      element: (
-        <ProtectedRoute>
-          <ImportPage />
-        </ProtectedRoute>
-      ),
+      path: "/import", // Redirect legacy /import to /my-lists
+      element: <Navigate to="/my-lists" replace />,
     },
     {
       path: "/import/review", // Add new route for import review page

@@ -6,8 +6,10 @@ import { fetchLists } from '../util/listsSlice';
 import Header from './Header';
 import Footer from './Footer';
 import { getAuth } from 'firebase/auth';
+import { downloadTemplateCsv, getExpectedHeaders } from '../util/csvTemplate';
+import { Download, Upload, FileText } from 'lucide-react';
 
-const EXPECTED_HEADERS = ['tmdbId','imdbId','name','year','mediaType','tmdbRating','imdbRating','tmdbVotes','imdbVotes'];
+const EXPECTED_HEADERS = getExpectedHeaders();
 
 const ImportPage = () => {
   const navigate = useNavigate();
@@ -139,6 +141,30 @@ const ImportPage = () => {
         <div className="max-w-2xl mx-auto bg-gray-900 rounded-xl p-6 shadow-lg">
           <h1 className="text-3xl font-bold text-white mb-6 text-center">Import CSV to Your List</h1>
 
+          {/* Template Download Section */}
+          <div className="mb-6 p-4 bg-green-900/20 border border-green-700 rounded-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h2 className="text-sm font-semibold text-green-300 mb-2 flex items-center gap-2">
+                  <FileText size={16} />
+                  Need a Template?
+                </h2>
+                <p className="text-xs text-gray-300 mb-2">
+                  Download a template CSV with the correct format and an example row.
+                </p>
+              </div>
+              <button
+                onClick={downloadTemplateCsv}
+                className="ml-4 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm flex items-center gap-2 transition-colors shrink-0"
+                aria-label="Download template CSV"
+              >
+                <Download size={14} />
+                Download Template
+              </button>
+            </div>
+          </div>
+
+          {/* Format Info Section */}
           <div className="mb-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
             <h2 className="text-sm font-semibold text-blue-300 mb-2">Required CSV Format</h2>
             <p className="text-xs text-gray-300 mb-2">Your CSV must have these exact headers (case-sensitive):</p>
@@ -146,7 +172,9 @@ const ImportPage = () => {
               {EXPECTED_HEADERS.join(',')}
             </code>
             <p className="text-xs text-gray-400 mt-2">
-              Tip: Export a list from this app to get the correct format. Empty values allowed for: imdbId, imdbRating, imdbVotes
+              • IMDb fields (imdbId, imdbRating, imdbVotes) may be empty<br />
+              • TMDB is the primary data source<br />
+              • Large files may take longer to analyze
             </p>
           </div>
           
@@ -248,6 +276,33 @@ const ImportPage = () => {
               </button>
             </div>
           </form>
+
+          {/* User Guidance Panel */}
+          <div className="mt-6 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+            <h3 className="text-sm font-semibold text-gray-300 mb-3">Quick Tips</h3>
+            <ul className="text-xs text-gray-400 space-y-2">
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span><strong>Header order matters:</strong> Must match exactly (case-sensitive)</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span><strong>IMDb fields optional:</strong> Leave imdbId, imdbRating, imdbVotes empty if unknown</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span><strong>TMDB is primary:</strong> We use tmdbId for matching, IMDb for ratings</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span><strong>Large files:</strong> Files with 500+ rows may take 10-30 seconds to analyze</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span><strong>Review step:</strong> You'll be able to select which items to import</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </main>
     </div>

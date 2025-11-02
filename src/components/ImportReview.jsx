@@ -22,6 +22,9 @@ const ImportReview = () => {
     duplicates: []
   });
   
+  // State to manage checked items (default all checked)
+  const [checkedItems, setCheckedItems] = useState(new Set());
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchModal, setSearchModal] = useState({
@@ -34,8 +37,38 @@ const ImportReview = () => {
   useEffect(() => {
     if (analysisData) {
       setLocalAnalysisData(analysisData);
+      // Default all matched items to checked
+      const initialChecked = new Set(
+        analysisData.matched.map((item, index) => `matched-${index}`)
+      );
+      setCheckedItems(initialChecked);
     }
   }, [analysisData]);
+
+  // Toggle individual checkbox
+  const toggleCheckbox = (itemId) => {
+    setCheckedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all / Deselect all
+  const toggleSelectAll = () => {
+    if (checkedItems.size === localAnalysisData.matched.length) {
+      // All selected, deselect all
+      setCheckedItems(new Set());
+    } else {
+      // Some or none selected, select all
+      const allItems = localAnalysisData.matched.map((_, index) => `matched-${index}`);
+      setCheckedItems(new Set(allItems));
+    }
+  };
 
   // Function to handle ignoring unmatched items
   const handleIgnoreUnmatched = (index) => {
@@ -78,6 +111,13 @@ const ImportReview = () => {
       };
     });
     
+    // Auto-check newly added item
+    setCheckedItems(prev => {
+      const newSet = new Set(prev);
+      newSet.add(`matched-${localAnalysisData.matched.length}`);
+      return newSet;
+    });
+    
     // Close the modal
     setSearchModal({
       isOpen: false,
@@ -100,12 +140,17 @@ const ImportReview = () => {
       const auth = getAuth();
       const token = await auth.currentUser.getIdToken(true);
 
-      // Collect all movie IDs to import (from matched items and resolved unmatched items)
-      // For matched items: use the tmdbId
-      const moviesToImport = localAnalysisData.matched.map(item => String(item.movie.id || item.movie.tmdbId));
+      // Collect only checked movie IDs to import
+      const moviesToImport = localAnalysisData.matched
+        .map((item, index) => ({
+          id: String(item.movie.id || item.movie.tmdbId),
+          key: `matched-${index}`
+        }))
+        .filter(item => checkedItems.has(item.key))
+        .map(item => item.id);
 
       if (moviesToImport.length === 0) {
-        setError('No items to import.');
+        setError('No items selected to import. Please check at least one item.');
         return;
       }
 
@@ -184,25 +229,52 @@ const ImportReview = () => {
             </div>
           )}
           
-          {/* Matched Items Section */}
+          {/* Matched Items Section with Checkboxes */}
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-white">
                 Matched Items ({localAnalysisData.matched.length})
+                {localAnalysisData.matched.length > 0 && (
+                  <span className="text-sm text-gray-400 ml-2">
+                    ({checkedItems.size} selected)
+                  </span>
+                )}
               </h2>
+              {localAnalysisData.matched.length > 0 && (
+                <button
+                  onClick={toggleSelectAll}
+                  className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"
+                >
+                  {checkedItems.size === localAnalysisData.matched.length ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
             </div>
             <div className="bg-gray-800/50 rounded-lg p-4">
               {localAnalysisData.matched.length === 0 ? (
                 <p className="text-gray-400 text-center py-4">No matched items to display</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {localAnalysisData.matched.map((item, index) => (
-                    <ImportMovieItem 
-                      key={`matched-${index}`} 
-                      movie={item.movie} 
-                      type="matched" 
-                    />
-                  ))}
+                  {localAnalysisData.matched.map((item, index) => {
+                    const itemId = `matched-${index}`;
+                    const isChecked = checkedItems.has(itemId);
+                    return (
+                      <div key={itemId} className="relative">
+                        <div className="absolute top-2 left-2 z-10">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleCheckbox(itemId)}
+                            className="w-5 h-5 rounded border-gray-600 text-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
+                            aria-label={`Select ${item.movie.title || item.movie.name}`}
+                          />
+                        </div>
+                        <ImportMovieItem 
+                          movie={item.movie} 
+                          type="matched" 
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -281,9 +353,9 @@ const ImportReview = () => {
           <div className="flex justify-center mt-8">
             <button
               onClick={handleConfirmImport}
-              disabled={loading || !allUnmatchedResolved}
+              disabled={loading || !allUnmatchedResolved || checkedItems.size === 0}
               className={`px-8 py-3 rounded-lg text-white font-semibold ${
-                loading || !allUnmatchedResolved
+                loading || !allUnmatchedResolved || checkedItems.size === 0
                   ? 'bg-gray-700 cursor-not-allowed'
                   : 'bg-green-600 hover:bg-green-700'
               }`}
@@ -297,7 +369,7 @@ const ImportReview = () => {
                   Confirming Import...
                 </div>
               ) : (
-                `Confirm Import ${localAnalysisData.matched.length} Movies`
+                `Confirm Import (${checkedItems.size} ${checkedItems.size === 1 ? 'item' : 'items'})`
               )}
             </button>
           </div>
@@ -305,6 +377,11 @@ const ImportReview = () => {
           {!allUnmatchedResolved && (
             <p className="text-red-500 text-center mt-4">
               Please resolve all unmatched items before confirming import
+            </p>
+          )}
+          {allUnmatchedResolved && checkedItems.size === 0 && (
+            <p className="text-yellow-500 text-center mt-4">
+              Please select at least one item to import
             </p>
           )}
         </div>
