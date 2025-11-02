@@ -131,13 +131,34 @@ async function fetchTmdbDetails(mediaType, tmdbId, apiKey) {
         return null;
     }
 }
+/**
+ * Configuration accessor for IMDb API base URL.
+ * Required for IMDb rating lookups during CSV export.
+ *
+ * DEVNOTE: Set IMDB_API_BASE_URL in your environment:
+ * - Local: Add to .env or .runtimeconfig.json
+ * - Staging/Prod: Use Firebase Functions config or Cloud Console
+ * - Example: firebase functions:config:set imdb.api_base_url="https://api.imdbapi.dev"
+ *
+ * @returns {string} The IMDb API base URL
+ * @throws {Error} If IMDB_API_BASE_URL is not configured
+ */
+function getImdbApiBaseUrl() {
+    const baseUrl = process.env.IMDB_API_BASE_URL;
+    if (!baseUrl) {
+        const errorMsg = 'IMDB_API_BASE_URL environment variable is not configured. IMDb ratings will be unavailable.';
+        console.error(`❌ ${errorMsg}`);
+        throw new Error(errorMsg);
+    }
+    return baseUrl.replace(/\/$/, ''); // Remove trailing slash
+}
 async function fetchImdbRatings(imdbId) {
     var _a, _b, _c, _d, _e;
     if (!imdbId)
         return null;
-    const base = (process.env.IMDB_API_BASE_URL || 'https://api.imdbapi.dev').replace(/\/$/, '');
-    const url = `${base}/titles/${imdbId}`;
     try {
+        const base = getImdbApiBaseUrl();
+        const url = `${base}/titles/${imdbId}`;
         const res = await fetchWithTimeout(url, {}, 8000);
         if (!res.ok)
             return null;
@@ -149,7 +170,13 @@ async function fetchImdbRatings(imdbId) {
             votes: typeof votes === 'number' ? votes : (typeof votes === 'string' ? parseInt(votes.replace(/[,]/g, ''), 10) : undefined)
         };
     }
-    catch (_f) {
+    catch (err) {
+        // If IMDB_API_BASE_URL not configured, log once and return null (graceful degradation)
+        if (err instanceof Error && err.message.includes('IMDB_API_BASE_URL')) {
+            console.warn('IMDb ratings unavailable - IMDB_API_BASE_URL not configured');
+            return null;
+        }
+        console.error(`fetchImdbRatings error for ${imdbId}:`, err);
         return null;
     }
 }
