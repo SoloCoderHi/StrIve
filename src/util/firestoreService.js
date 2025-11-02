@@ -10,6 +10,36 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { getImdbId } from "./imdbResolver";
+import IMDbService from "./imdbService";
+
+/**
+ * Fetches IMDB rating and votes for a media item
+ * @param {string} tmdbId - The TMDB ID
+ * @param {string} mediaType - The media type ('movie' or 'tv')
+ * @returns {Promise<Object>} Object with imdbRating, imdbVotes, and imdbId
+ */
+const fetchImdbData = async (tmdbId, mediaType) => {
+  try {
+    const imdbService = new IMDbService();
+    const imdbId = await getImdbId(tmdbId, mediaType);
+    
+    if (!imdbId) {
+      return { imdbId: '', imdbRating: '', imdbVotes: '' };
+    }
+    
+    const titleData = await imdbService.getTitleById(imdbId);
+    
+    return {
+      imdbId: imdbId,
+      imdbRating: titleData?.rating?.star || '',
+      imdbVotes: titleData?.rating?.count || ''
+    };
+  } catch (error) {
+    console.warn(`Failed to fetch IMDB data: ${error.message}`);
+    return { imdbId: '', imdbRating: '', imdbVotes: '' };
+  }
+};
 
 /**
  * Adds or updates a media item in a user's specific list in Firestore.
@@ -19,14 +49,23 @@ import { db } from "./firebase";
  */
 export const addToList = async (userId, listName, mediaItem) => {
   try {
+    const mediaType = mediaItem.media_type || (mediaItem.first_air_date ? 'tv' : 'movie');
+    
+    // Fetch IMDB data
+    const imdbData = await fetchImdbData(mediaItem.id, mediaType);
+    
     const itemToSave = {
       id: mediaItem.id,
       title: mediaItem.title || mediaItem.name,
       poster_path: mediaItem.poster_path,
       release_date: mediaItem.release_date || mediaItem.first_air_date,
       vote_average: mediaItem.vote_average,
-      media_type: mediaItem.media_type || (mediaItem.first_air_date ? 'tv' : 'movie'),
+      vote_count: mediaItem.vote_count,
+      media_type: mediaType,
       dateAdded: new Date().toISOString(),
+      imdbId: imdbData.imdbId,
+      imdbRating: imdbData.imdbRating,
+      imdbVotes: imdbData.imdbVotes,
     };
     const itemRef = doc(db, "users", userId, listName, String(mediaItem.id));
     await setDoc(itemRef, itemToSave);
@@ -134,14 +173,23 @@ export const deleteCustomList = async (userId, listId) => {
  */
 export const addItemToCustomList = async (userId, listId, mediaItem) => {
   try {
+    const mediaType = mediaItem.media_type || (mediaItem.first_air_date ? 'tv' : 'movie');
+    
+    // Fetch IMDB data
+    const imdbData = await fetchImdbData(mediaItem.id, mediaType);
+    
     const itemToSave = {
       id: mediaItem.id,
       title: mediaItem.title || mediaItem.name,
       poster_path: mediaItem.poster_path,
       release_date: mediaItem.release_date || mediaItem.first_air_date,
       vote_average: mediaItem.vote_average,
-      media_type: mediaItem.media_type || (mediaItem.first_air_date ? 'tv' : 'movie'),
+      vote_count: mediaItem.vote_count,
+      media_type: mediaType,
       dateAdded: new Date(),
+      imdbId: imdbData.imdbId,
+      imdbRating: imdbData.imdbRating,
+      imdbVotes: imdbData.imdbVotes,
     };
     const itemsCollectionRef = collection(db, "users", userId, "custom_lists", listId, "items");
     const itemRef = doc(itemsCollectionRef, String(mediaItem.id));

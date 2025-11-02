@@ -21,6 +21,10 @@ describe('exportToCsv', () => {
           release_date: '1999-03-30',
           media_type: 'movie',
           vote_average: 8.7,
+          vote_count: 25000,
+          imdbRating: 8.7,
+          imdbVotes: 1800000,
+          imdbId: 'tt0133093',
           dateAdded: '2024-01-15T10:30:00Z'
         },
         {
@@ -29,6 +33,10 @@ describe('exportToCsv', () => {
           release_date: '2010-07-16',
           media_type: 'movie',
           vote_average: 8.1,
+          vote_count: 22000,
+          imdbRating: 8.8,
+          imdbVotes: 2300000,
+          imdbId: 'tt1375666',
           dateAdded: '2024-01-16T14:20:00Z'
         }
       ]
@@ -43,6 +51,10 @@ describe('exportToCsv', () => {
           release_date: '2014-11-07',
           media_type: 'movie',
           vote_average: 8.6,
+          vote_count: 28000,
+          imdbRating: 8.7,
+          imdbVotes: 1900000,
+          imdbId: 'tt0816692',
           dateAdded: '2024-01-17T09:15:00Z'
         }
       ]
@@ -72,7 +84,7 @@ describe('exportToCsv', () => {
       const lines = csvResult.trim().split('\n');
       
       // Check headers
-      expect(lines[0]).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID');
+      expect(lines[0]).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID');
       
       // Check first data row (first item from first list)
       const firstRow = lines[1].split(',');
@@ -80,8 +92,12 @@ describe('exportToCsv', () => {
       expect(firstRow[1]).toBe('The Matrix');    // Title
       expect(firstRow[2]).toBe('1999');           // Year
       expect(firstRow[3]).toBe('movie');          // Type
-      expect(firstRow[4]).toBe('8.7');            // Rating
-      expect(firstRow[6]).toBe('123456');         // TMDB ID
+      expect(firstRow[4]).toBe('8.7');            // TMDB Rating
+      expect(firstRow[5]).toBe('8.7');            // IMDB Rating
+      expect(firstRow[6]).toBe('25000');          // TMDB Votes
+      expect(firstRow[7]).toBe('1800000');        // IMDB Votes
+      expect(firstRow[9]).toBe('123456');         // TMDB ID
+      expect(firstRow[10]).toBe('tt0133093');     // IMDB ID
       
       // Check that we have the right number of rows
       expect(lines).toHaveLength(4); // Header + 3 items
@@ -94,7 +110,7 @@ describe('exportToCsv', () => {
       const lines = csvResult.trim().split('\n');
       
       // Special characters should be properly handled
-      expect(lines[0]).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID');
+      expect(lines[0]).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID');
       
       // The second line should contain the fields
       expect(lines[1]).toContain('Special "Characters", List');
@@ -107,7 +123,7 @@ describe('exportToCsv', () => {
       // Should return only headers
       const lines = csvResult.trim().split('\n');
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID');
+      expect(lines[0]).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID');
     });
 
     test('should handle null/undefined input gracefully', () => {
@@ -115,8 +131,8 @@ describe('exportToCsv', () => {
       const csvResult2 = mapListsToCsv(undefined);
       
       // Both should return headers only
-      expect(csvResult1).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID\n');
-      expect(csvResult2).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID\n');
+      expect(csvResult1).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID\n');
+      expect(csvResult2).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID\n');
     });
 
     test('should handle lists with missing items gracefully', () => {
@@ -126,7 +142,7 @@ describe('exportToCsv', () => {
       // Should return only headers
       const lines = csvResult.trim().split('\n');
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID');
+      expect(lines[0]).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID');
     });
 
     test('should handle items with missing fields gracefully', () => {
@@ -144,7 +160,7 @@ describe('exportToCsv', () => {
       
       // Should have header and one data row
       expect(lines).toHaveLength(2);
-      expect(lines[0]).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID');
+      expect(lines[0]).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID');
       
       // Row should have defaults for missing fields
       const dataRow = lines[1].split(',');
@@ -152,8 +168,11 @@ describe('exportToCsv', () => {
       expect(dataRow[1]).toBe('Unknown');  // Default title
       expect(dataRow[2]).toBe('');          // Empty year
       expect(dataRow[3]).toBe('movie');     // Default type
-      expect(dataRow[4]).toBe('');          // Empty rating
-      expect(dataRow[6]).toBe('111111');    // TMDB ID
+      expect(dataRow[4]).toBe('');          // Empty TMDB rating
+      expect(dataRow[5]).toBe('');          // Empty IMDB rating
+      expect(dataRow[6]).toBe('');          // Empty TMDB votes
+      expect(dataRow[7]).toBe('');          // Empty IMDB votes
+      expect(dataRow[9]).toBe('111111');    // TMDB ID
     });
 
     test('should handle malformed dates gracefully', () => {
@@ -177,7 +196,7 @@ describe('exportToCsv', () => {
       
       // Malformed date should result in empty year
       expect(dataRow[2]).toBe('');
-      expect(dataRow[4]).toBe('6.5');  // Rating should still work
+      expect(dataRow[4]).toBe('6.5');  // TMDB Rating should still work
     });
   });
 
@@ -189,7 +208,7 @@ describe('exportToCsv', () => {
       const lines = csvResult.trim().split('\n');
       
       // Check headers
-      expect(lines[0]).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID');
+      expect(lines[0]).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID');
       
       // Check data rows
       expect(lines).toHaveLength(3); // Header + 2 items
@@ -199,14 +218,16 @@ describe('exportToCsv', () => {
       expect(firstRow[0]).toBe('My Favorites');
       expect(firstRow[1]).toBe('The Matrix');
       expect(firstRow[2]).toBe('1999');
-      expect(firstRow[6]).toBe('123456');
+      expect(firstRow[9]).toBe('123456');
+      expect(firstRow[10]).toBe('tt0133093');
       
       // Second item
       const secondRow = lines[2].split(',');
       expect(secondRow[0]).toBe('My Favorites');
       expect(secondRow[1]).toBe('Inception');
       expect(secondRow[2]).toBe('2010');
-      expect(secondRow[6]).toBe('789012');
+      expect(secondRow[9]).toBe('789012');
+      expect(secondRow[10]).toBe('tt1375666');
     });
 
     test('should handle invalid single list input gracefully', () => {
@@ -215,9 +236,9 @@ describe('exportToCsv', () => {
       const csvResult3 = mapSingleListToCsv('invalid');
       
       // All should return headers only
-      expect(csvResult1).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID\n');
-      expect(csvResult2).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID\n');
-      expect(csvResult3).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID\n');
+      expect(csvResult1).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID\n');
+      expect(csvResult2).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID\n');
+      expect(csvResult3).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID\n');
     });
 
     test('should handle single list with empty items gracefully', () => {
@@ -227,7 +248,7 @@ describe('exportToCsv', () => {
       // Should return only headers
       const lines = csvResult.trim().split('\n');
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toBe('List Name,Title,Year,Type,Rating,Date Added,TMDB ID');
+      expect(lines[0]).toBe('List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID');
     });
   });
 });

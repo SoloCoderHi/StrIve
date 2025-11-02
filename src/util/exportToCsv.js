@@ -45,14 +45,14 @@ export const mapSingleListToCsv = (list) => {
   // Validate input
   if (!list || typeof list !== 'object') {
     console.error('Invalid list object provided to mapSingleListToCsv');
-    return 'List Name,Title,Year,Type,Rating,Date Added,TMDB ID\n';
+    return 'List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID\n';
   }
 
   // Prepare CSV data array
   const csvData = [];
   
   // Add headers
-  csvData.push(['List Name', 'Title', 'Year', 'Type', 'Rating', 'Date Added', 'TMDB ID']);
+  csvData.push(['List Name', 'Title', 'Year', 'Type', 'TMDB Rating', 'IMDB Rating', 'TMDB Votes', 'IMDB Votes', 'Date Added', 'TMDB ID', 'IMDB ID']);
   
   // Process list items with proper edge case handling
   if (list.items && Array.isArray(list.items) && list.items.length > 0) {
@@ -69,9 +69,13 @@ export const mapSingleListToCsv = (list) => {
         formatText(item.title || item.name || 'Unknown'),   // Title
         extractYear(item.release_date),                     // Year
         formatText(item.media_type || 'movie'),            // Type
-        formatRating(item.vote_average),                    // Rating
+        formatRating(item.vote_average),                    // TMDB Rating
+        formatRating(item.imdbRating),                      // IMDB Rating
+        formatText(item.vote_count || ''),                  // TMDB Votes
+        formatText(item.imdbVotes || ''),                   // IMDB Votes
         formatText(item.dateAdded || ''),                   // Date Added
-        formatText(item.id || '')                           // TMDB ID
+        formatText(item.id || ''),                          // TMDB ID
+        formatText(item.imdbId || '')                       // IMDB ID
       ]);
     });
   }
@@ -92,14 +96,14 @@ export const mapListsToCsv = (lists) => {
   // Validate input
   if (!Array.isArray(lists)) {
     console.error('Invalid lists array provided to mapListsToCsv');
-    return 'List Name,Title,Year,Type,Rating,Date Added,TMDB ID\n';
+    return 'List Name,Title,Year,Type,TMDB Rating,IMDB Rating,TMDB Votes,IMDB Votes,Date Added,TMDB ID,IMDB ID\n';
   }
 
   // Prepare CSV data array
   const csvData = [];
   
   // Add headers
-  csvData.push(['List Name', 'Title', 'Year', 'Type', 'Rating', 'Date Added', 'TMDB ID']);
+  csvData.push(['List Name', 'Title', 'Year', 'Type', 'TMDB Rating', 'IMDB Rating', 'TMDB Votes', 'IMDB Votes', 'Date Added', 'TMDB ID', 'IMDB ID']);
   
   // Process each list and its items with proper edge case handling
   lists.forEach(list => {
@@ -129,9 +133,13 @@ export const mapListsToCsv = (lists) => {
         formatText(item.title || item.name || 'Unknown'),   // Title
         extractYear(item.release_date),                     // Year
         formatText(item.media_type || 'movie'),            // Type
-        formatRating(item.vote_average),                    // Rating
+        formatRating(item.vote_average),                    // TMDB Rating
+        formatRating(item.imdbRating),                      // IMDB Rating
+        formatText(item.vote_count || ''),                  // TMDB Votes
+        formatText(item.imdbVotes || ''),                   // IMDB Votes
         formatText(item.dateAdded || ''),                   // Date Added
-        formatText(item.id || '')                           // TMDB ID
+        formatText(item.id || ''),                          // TMDB ID
+        formatText(item.imdbId || '')                       // IMDB ID
       ]);
     });
   });

@@ -1,5 +1,6 @@
 import { getAuth } from 'firebase/auth';
 import { notifyInfo, notifyError } from './notify';
+import { exportListClientSide } from './clientSideExport';
 
 function parseFilenameFromContentDisposition(header) {
   if (!header) return null;
@@ -33,36 +34,70 @@ export async function exportListCsv(listId, listName) {
     notifyError('Please sign in to export.');
     return { ok: false, status: 401 };
   }
-  const token = await user.getIdToken(/* forceRefresh */ true);
 
-  const resp = await fetch(`/lists/${encodeURIComponent(listId)}/export`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  // Check if we should try server-side export
+  const useServerExport = import.meta.env.PROD || import.meta.env.USE_FIREBASE_EMULATOR === 'true';
 
-  if (resp.status === 204) {
-    notifyInfo('No items to export');
-    return { ok: false, status: 204 };
+  if (useServerExport) {
+    try {
+      // Try server-side export (production or with emulator)
+      const token = await user.getIdToken(/* forceRefresh */ true);
+      const resp = await fetch(`/lists/${encodeURIComponent(listId)}/export`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (resp.status === 204) {
+        notifyInfo('No items to export');
+        return { ok: false, status: 204 };
+      }
+      
+      if (resp.ok) {
+        // Server export succeeded
+        const blob = await resp.blob();
+        const cd = resp.headers.get('Content-Disposition');
+        const headerName = parseFilenameFromContentDisposition(cd);
+        const filename = headerName || buildFallbackFilename(listId, listName);
+
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        return { ok: true, status: 200, filename };
+      }
+      
+      // Server failed - fall back to client-side export
+      console.log('Server export failed, using client-side export...');
+    } catch (error) {
+      // Network error or server unreachable - fall back to client-side export
+      console.log('Server export error, using client-side export:', error.message);
+    }
   }
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
-    notifyError(`Export failed (${resp.status}). ${text || 'Try again.'}`);
-    return { ok: false, status: resp.status };
+
+  // Use client-side export (development without emulator or fallback)
+  try {
+    const result = await exportListClientSide(listId, listName, user.uid);
+    
+    if (result.isEmpty) {
+      notifyInfo('No items to export');
+      return { ok: false, status: 204 };
+    }
+    
+    if (result.success) {
+      notifyInfo(`Exported ${result.count} items successfully`);
+      return { ok: true, status: 200 };
+    }
+    
+    throw new Error(result.message || 'Export failed');
+    
+  } catch (error) {
+    console.error('Export error:', error);
+    notifyError(`Export failed: ${error.message}`);
+    return { ok: false, status: 500 };
   }
-
-  const blob = await resp.blob();
-  const cd = resp.headers.get('Content-Disposition');
-  const headerName = parseFilenameFromContentDisposition(cd);
-  const filename = headerName || buildFallbackFilename(listId, listName);
-
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
-
-  return { ok: true, status: 200, filename };
 }

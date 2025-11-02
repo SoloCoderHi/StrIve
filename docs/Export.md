@@ -12,6 +12,8 @@ Auth
 CSV schema and formatting
 - Header (exact order): tmdbId, imdbId, name, year, mediaType, tmdbRating, imdbRating, tmdbVotes, imdbVotes
 - Ratings as decimals (e.g., 7.3); votes as integers
+- **NEW**: IMDB ratings and votes are now stored in Firestore when items are added to lists
+- **NEW**: Export includes both TMDB and IMDB ratings/votes from stored data
 - Empty lists return 204 No Content (no body)
 
 Filename and headers
