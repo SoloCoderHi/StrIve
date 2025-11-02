@@ -19,6 +19,18 @@ const useImdbTitle = (tmdbId, mediaType = 'movie') => {
         setLoading(true);
         setError(null);
 
+        // Create an instance of IMDbService (will throw if env not configured)
+        let imdbService;
+        try {
+          imdbService = new IMDbService();
+        } catch (serviceError) {
+          // IMDb service not configured, gracefully disable
+          setData(null);
+          setError(serviceError.message);
+          setLoading(false);
+          return;
+        }
+
         // First get the IMDb ID using the TMDB ID
         const imdbId = await getImdbId(tmdbId, mediaType);
 
@@ -29,8 +41,7 @@ const useImdbTitle = (tmdbId, mediaType = 'movie') => {
           return;
         }
 
-        // Create an instance of IMDbService and fetch the title data
-        const imdbService = new IMDbService();
+        // Fetch the title data
         const titleData = await imdbService.getTitleById(imdbId);
 
         setData(titleData);

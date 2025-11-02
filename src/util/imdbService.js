@@ -1,10 +1,19 @@
 /**
  * IMDb Service
- * Handles all API calls to api.imdbapi.dev
+ * Handles all API calls to IMDb data provider
+ * Requires VITE_IMDB_BASE_URL environment variable
  */
 class IMDbService {
   constructor() {
-    this.baseUrl = import.meta.env.VITE_IMDB_BASE_URL || 'https://api.imdbapi.dev';
+    const baseUrl = import.meta.env.VITE_IMDB_BASE_URL;
+    
+    if (!baseUrl) {
+      const errorMsg = 'Missing VITE_IMDB_BASE_URL environment variable. IMDb features are disabled.';
+      console.error(`❌ ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+    
+    this.baseUrl = baseUrl;
   }
 
   /**

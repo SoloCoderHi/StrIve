@@ -140,11 +140,11 @@ const RatingSection = ({ ratings = {}, loading = false, fallbackRatings = {} }) 
       {ratings.source && !loading && (
         <div className="mt-4 text-center">
           <span className={`inline-block px-3 py-1 rounded-full text-xs ${
-            ratings.source === 'cache' || ratings.source === 'omdb' 
+            ratings.source === 'cache'
               ? 'bg-blue-900 text-blue-200' 
               : 'bg-gray-700 text-gray-200'
           }`}>
-            Data from {ratings.source === 'cache' || ratings.source === 'omdb' ? 'OMDb' : 'TMDB'}
+            Data from {ratings.source === 'cache' ? 'Cache' : 'TMDB'}
           </span>
         </div>
       )}
