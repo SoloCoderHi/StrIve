@@ -26,7 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.confirmListImport = exports.analyzeListImport = exports.listsExport = void 0;
+exports.getTvVideos = exports.getTvSeasonEpisodes = exports.getTvSeasons = exports.getTvDetails = exports.confirmListImport = exports.analyzeListImport = exports.listsExport = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const Papa = __importStar(require("papaparse"));
@@ -671,6 +671,294 @@ exports.confirmListImport = functions.https.onRequest(async (req, res) => {
         console.error('Error confirming list import:', error);
         res.status(500).json({ error: 'Internal server error' });
         return;
+    }
+});
+// ==================== TV SHOW API PROXY ENDPOINTS ====================
+// Simple in-memory cache for TV show data
+const tvCache = new Map();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+function getCached(key) {
+    const entry = tvCache.get(key);
+    if (!entry)
+        return null;
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+        tvCache.delete(key);
+        return null;
+    }
+    return entry.data;
+}
+function setCache(key, data) {
+    tvCache.set(key, { data, timestamp: Date.now() });
+}
+/**
+ * GET /api/tv/:tvId
+ * Fetches TV show details with optional IMDb enrichment
+ */
+exports.getTvDetails = functions.https.onRequest(async (req, res) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    if (req.method !== 'GET') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+    }
+    const tvId = req.path.split('/').pop();
+    if (!tvId) {
+        res.status(400).json({ error: 'TV ID is required' });
+        return;
+    }
+    const cacheKey = `tv_details_${tvId}`;
+    const cached = getCached(cacheKey);
+    if (cached) {
+        res.status(200).json(cached);
+        return;
+    }
+    try {
+        const tmdbApiKey = process.env.TMDB_API_KEY;
+        if (!tmdbApiKey) {
+            res.status(500).json({ error: 'TMDB API key not configured' });
+            return;
+        }
+        const url = `https://api.themoviedb.org/3/tv/${tvId}?api_key=${tmdbApiKey}&append_to_response=external_ids,images&include_image_language=en,null`;
+        const response = await fetchWithTimeout(url, {}, 15000);
+        if (!response.ok) {
+            res.status(response.status).json({ error: 'Failed to fetch TV show details' });
+            return;
+        }
+        const data = await response.json();
+        // Normalize to stable shape
+        const normalized = {
+            id: data.id,
+            name: data.name,
+            overview: data.overview,
+            posterPath: data.poster_path,
+            backdropPath: data.backdrop_path,
+            firstAirDate: data.first_air_date,
+            lastAirDate: data.last_air_date,
+            status: data.status,
+            numberOfSeasons: data.number_of_seasons,
+            numberOfEpisodes: data.number_of_episodes,
+            genres: ((_a = data.genres) === null || _a === void 0 ? void 0 : _a.map((g) => ({ id: g.id, name: g.name }))) || [],
+            networks: ((_b = data.networks) === null || _b === void 0 ? void 0 : _b.map((n) => ({ id: n.id, name: n.name, logoPath: n.logo_path }))) || [],
+            voteAverage: data.vote_average,
+            voteCount: data.vote_count,
+            logos: ((_d = (_c = data.images) === null || _c === void 0 ? void 0 : _c.logos) === null || _d === void 0 ? void 0 : _d.map((l) => ({ filePath: l.file_path, aspectRatio: l.aspect_ratio }))) || [],
+            imdbId: ((_e = data.external_ids) === null || _e === void 0 ? void 0 : _e.imdb_id) || null,
+        };
+        // Optional IMDb enrichment
+        if (normalized.imdbId) {
+            try {
+                const imdbBase = process.env.IMDB_API_BASE_URL;
+                if (imdbBase) {
+                    const imdbUrl = `${imdbBase.replace(/\/$/, '')}/titles/${normalized.imdbId}`;
+                    const imdbRes = await fetchWithTimeout(imdbUrl, {}, 8000);
+                    if (imdbRes.ok) {
+                        const imdbData = await imdbRes.json();
+                        normalized.imdbRating = ((_f = imdbData === null || imdbData === void 0 ? void 0 : imdbData.rating) === null || _f === void 0 ? void 0 : _f.aggregateRating) || (imdbData === null || imdbData === void 0 ? void 0 : imdbData.rating) || null;
+                        normalized.imdbVotes = ((_g = imdbData === null || imdbData === void 0 ? void 0 : imdbData.rating) === null || _g === void 0 ? void 0 : _g.voteCount) || (imdbData === null || imdbData === void 0 ? void 0 : imdbData.votes) || null;
+                    }
+                }
+            }
+            catch (imdbError) {
+                console.warn('IMDb fetch failed, continuing without IMDb data', imdbError);
+            }
+        }
+        setCache(cacheKey, normalized);
+        res.status(200).json(normalized);
+    }
+    catch (error) {
+        console.error('Error fetching TV details:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+/**
+ * GET /api/tv/:tvId/seasons
+ * Returns list of season metadata
+ */
+exports.getTvSeasons = functions.https.onRequest(async (req, res) => {
+    var _a;
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    if (req.method !== 'GET') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+    }
+    const pathParts = req.path.split('/').filter(Boolean);
+    const tvId = pathParts[pathParts.length - 2];
+    if (!tvId) {
+        res.status(400).json({ error: 'TV ID is required' });
+        return;
+    }
+    const cacheKey = `tv_seasons_${tvId}`;
+    const cached = getCached(cacheKey);
+    if (cached) {
+        res.status(200).json(cached);
+        return;
+    }
+    try {
+        const tmdbApiKey = process.env.TMDB_API_KEY;
+        if (!tmdbApiKey) {
+            res.status(500).json({ error: 'TMDB API key not configured' });
+            return;
+        }
+        const url = `https://api.themoviedb.org/3/tv/${tvId}?api_key=${tmdbApiKey}`;
+        const response = await fetchWithTimeout(url, {}, 15000);
+        if (!response.ok) {
+            res.status(response.status).json({ error: 'Failed to fetch TV show' });
+            return;
+        }
+        const data = await response.json();
+        const seasons = ((_a = data.seasons) === null || _a === void 0 ? void 0 : _a.map((s) => ({
+            id: s.id,
+            name: s.name,
+            seasonNumber: s.season_number,
+            episodeCount: s.episode_count,
+            airDate: s.air_date,
+            posterPath: s.poster_path,
+        }))) || [];
+        setCache(cacheKey, seasons);
+        res.status(200).json(seasons);
+    }
+    catch (error) {
+        console.error('Error fetching TV seasons:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+/**
+ * GET /api/tv/:tvId/season/:seasonNumber
+ * Returns episodes for a specific season
+ */
+exports.getTvSeasonEpisodes = functions.https.onRequest(async (req, res) => {
+    var _a;
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    if (req.method !== 'GET') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+    }
+    const pathParts = req.path.split('/').filter(Boolean);
+    const tvId = pathParts[pathParts.length - 3];
+    const seasonNumber = pathParts[pathParts.length - 1];
+    if (!tvId || !seasonNumber) {
+        res.status(400).json({ error: 'TV ID and season number are required' });
+        return;
+    }
+    const cacheKey = `tv_season_${tvId}_${seasonNumber}`;
+    const cached = getCached(cacheKey);
+    if (cached) {
+        res.status(200).json(cached);
+        return;
+    }
+    try {
+        const tmdbApiKey = process.env.TMDB_API_KEY;
+        if (!tmdbApiKey) {
+            res.status(500).json({ error: 'TMDB API key not configured' });
+            return;
+        }
+        const url = `https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNumber}?api_key=${tmdbApiKey}`;
+        const response = await fetchWithTimeout(url, {}, 15000);
+        if (!response.ok) {
+            res.status(response.status).json({ error: 'Failed to fetch season episodes' });
+            return;
+        }
+        const data = await response.json();
+        const normalized = {
+            seasonNumber: data.season_number,
+            name: data.name,
+            overview: data.overview,
+            airDate: data.air_date,
+            episodes: ((_a = data.episodes) === null || _a === void 0 ? void 0 : _a.map((ep) => ({
+                id: ep.id,
+                name: ep.name,
+                episodeNumber: ep.episode_number,
+                seasonNumber: ep.season_number,
+                overview: ep.overview,
+                stillPath: ep.still_path,
+                airDate: ep.air_date,
+                runtime: ep.runtime,
+                voteAverage: ep.vote_average,
+                voteCount: ep.vote_count,
+            }))) || [],
+        };
+        setCache(cacheKey, normalized);
+        res.status(200).json(normalized);
+    }
+    catch (error) {
+        console.error('Error fetching season episodes:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+/**
+ * GET /api/tv/:tvId/videos
+ * Returns trailers and videos for a TV show
+ */
+exports.getTvVideos = functions.https.onRequest(async (req, res) => {
+    var _a;
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    if (req.method !== 'GET') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+    }
+    const pathParts = req.path.split('/').filter(Boolean);
+    const tvId = pathParts[pathParts.length - 2];
+    if (!tvId) {
+        res.status(400).json({ error: 'TV ID is required' });
+        return;
+    }
+    const cacheKey = `tv_videos_${tvId}`;
+    const cached = getCached(cacheKey);
+    if (cached) {
+        res.status(200).json(cached);
+        return;
+    }
+    try {
+        const tmdbApiKey = process.env.TMDB_API_KEY;
+        if (!tmdbApiKey) {
+            res.status(500).json({ error: 'TMDB API key not configured' });
+            return;
+        }
+        const url = `https://api.themoviedb.org/3/tv/${tvId}/videos?api_key=${tmdbApiKey}`;
+        const response = await fetchWithTimeout(url, {}, 15000);
+        if (!response.ok) {
+            res.status(response.status).json({ error: 'Failed to fetch videos' });
+            return;
+        }
+        const data = await response.json();
+        const videos = ((_a = data.results) === null || _a === void 0 ? void 0 : _a.map((v) => ({
+            id: v.id,
+            key: v.key,
+            name: v.name,
+            site: v.site,
+            type: v.type,
+            official: v.official,
+        }))) || [];
+        setCache(cacheKey, videos);
+        res.status(200).json(videos);
+    }
+    catch (error) {
+        console.error('Error fetching videos:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 // Export all functions for Firebase to recognize them

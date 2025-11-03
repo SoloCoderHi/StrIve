@@ -6,6 +6,7 @@ import MoviesPage from "./MoviesPage";
 import MovieDetails from "./MovieDetails";
 import MoviePlayer from "./MoviePlayer";
 import TVShowDetails from "./TVShowDetails";
+import TVShowDetailsPage from "./TVShowDetailsPage";
 import SearchPage from "./SearchPage";
 import ProtectedRoute from "./ProtectedRoute";
 import MyListPage from "./MyListPage"; // Import MyListPage
@@ -94,7 +95,7 @@ const Body = () => {
       path: "/shows/:tvId",
       element: (
         <ProtectedRoute>
-          <TVShowDetails />
+          <TVShowDetailsPage />
         </ProtectedRoute>
       ),
     },

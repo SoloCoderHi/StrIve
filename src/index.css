@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+/* AMOLED Design Tokens */
+:root {
+  --color-bg-primary: #000000;
+  --color-bg-elevated: #0B0B0B;
+  --color-bg-surface: #1A1A1A;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A0A0A0;
+  --color-text-tertiary: #666666;
+  --color-accent-primary: #10B981;
+  --color-accent-hover: #059669;
+  --color-accent-active: #047857;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --max-content-width: 1440px;
+  --gutter-size: 24px;
+  --gutter-size-lg: 32px;
+}
+
 /* Hide scrollbar for movie lists */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -23,5 +41,33 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: black;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+/* Focus styles */
+.focus-accent:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent-primary);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* AMOLED Page Wrapper */
+.amoled-page {
+  background-color: var(--color-bg-primary);
+  min-height: 100vh;
+  color: var(--color-text-primary);
+}
+
+.amoled-container {
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+  padding-left: var(--gutter-size);
+  padding-right: var(--gutter-size);
+}
+
+@media (min-width: 1024px) {
+  .amoled-container {
+    padding-left: var(--gutter-size-lg);
+    padding-right: var(--gutter-size-lg);
+  }
 }
