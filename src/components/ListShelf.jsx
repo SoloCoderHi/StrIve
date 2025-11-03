@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import MovieCard from './MovieCard';
+import useHorizontalScroll from '../hooks/useHorizontalScroll';
 
 const ListShelf = ({ title, items, mapsTo, onRemove, onDelete }) => {
+  const scrollRef = useRef(null);
+  useHorizontalScroll(scrollRef);
+
   return (
     <div className="mb-8">
       <div className="flex justify-between items-center mb-4">
@@ -25,7 +29,7 @@ const ListShelf = ({ title, items, mapsTo, onRemove, onDelete }) => {
           </button>
         )}
       </div>
-      <div className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
+      <div ref={scrollRef} className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide">
         {items && items.map((item) => (
           <div key={item.id} className="flex-shrink-0">
             <MovieCard 

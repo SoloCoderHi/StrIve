@@ -390,26 +390,44 @@ const TVShowDetailsPage = () => {
                     </div>
                   ) : seasonData?.episodes && seasonData.episodes.length > 0 ? (
                     viewMode === 'list' ? (
-                      // List View - Vertical scrolling container
-                      <div className="grid grid-cols-1 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
-                        {seasonData.episodes.map((episode) => (
-                          <EpisodeListItem
-                            key={episode.id}
-                            episode={episode}
-                            onClick={() => handleEpisodeClick(episode)}
-                          />
-                        ))}
+                      // List View - Vertical scrolling container with gradient fades
+                      <div className="relative">
+                        {/* Top gradient fade */}
+                        <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black to-transparent pointer-events-none z-10"></div>
+                        
+                        {/* Scrolling content */}
+                        <div className="grid grid-cols-1 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
+                          {seasonData.episodes.map((episode) => (
+                            <EpisodeListItem
+                              key={episode.id}
+                              episode={episode}
+                              onClick={() => handleEpisodeClick(episode)}
+                            />
+                          ))}
+                        </div>
+                        
+                        {/* Bottom gradient fade */}
+                        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent pointer-events-none z-10"></div>
                       </div>
                     ) : (
-                      // Grid View - Fixed at 3 episodes per row
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
-                        {seasonData.episodes.map((episode) => (
-                          <EpisodeCard
-                            key={episode.id}
-                            episode={episode}
-                            onClick={() => handleEpisodeClick(episode)}
-                          />
-                        ))}
+                      // Grid View - Fixed at 3 episodes per row with gradient fades
+                      <div className="relative">
+                        {/* Top gradient fade */}
+                        <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black to-transparent pointer-events-none z-10"></div>
+                        
+                        {/* Scrolling content */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
+                          {seasonData.episodes.map((episode) => (
+                            <EpisodeCard
+                              key={episode.id}
+                              episode={episode}
+                              onClick={() => handleEpisodeClick(episode)}
+                            />
+                          ))}
+                        </div>
+                        
+                        {/* Bottom gradient fade */}
+                        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent pointer-events-none z-10"></div>
                       </div>
                     )
                   ) : (

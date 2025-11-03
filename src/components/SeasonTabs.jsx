@@ -1,7 +1,11 @@
 import React, { useRef, useEffect } from "react";
+import useHorizontalScroll from "../hooks/useHorizontalScroll";
 
 const SeasonTabs = ({ totalSeasons, selectedSeason, onSeasonChange }) => {
   const tablistRef = useRef(null);
+
+  // Enable horizontal scroll with mouse wheel
+  useHorizontalScroll(tablistRef);
 
   useEffect(() => {
     const handleKeyDown = (e) => {

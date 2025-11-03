@@ -16,7 +16,7 @@ const EpisodeRatingBox = ({ rating, episodeNumber, seasonNumber, onClick }) => {
 
   return (
     <div 
-      className={`w-full h-12 flex items-center justify-center rounded-md font-bold text-sm transition-all hover:scale-105 cursor-pointer ${colorClasses}`}
+      className={`w-full h-full aspect-square flex items-center justify-center rounded-md font-bold text-sm transition-all hover:scale-105 cursor-pointer ${colorClasses}`}
       onClick={onClick}
       role="button"
       tabIndex={0}

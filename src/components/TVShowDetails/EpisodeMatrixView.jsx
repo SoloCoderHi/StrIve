@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import RatingLegend from './RatingLegend';
 import EpisodeRatingBox from './EpisodeRatingBox';
+import useHorizontalScroll from '../../hooks/useHorizontalScroll';
 
 const EpisodeMatrixView = ({ seasonsData, baseSeasonInfo, onEpisodeClick }) => {
+  const scrollContainerRef = useRef(null);
+  
+  // Enable horizontal scroll with mouse wheel
+  useHorizontalScroll(scrollContainerRef);
+
   if (!seasonsData || seasonsData.length === 0) {
     return (
       <div className="text-center py-12">
@@ -47,7 +53,11 @@ const EpisodeMatrixView = ({ seasonsData, baseSeasonInfo, onEpisodeClick }) => {
       <RatingLegend />
 
       {/* Matrix Table Container */}
-      <div className="overflow-x-auto scrollbar-hide" style={{ backgroundColor: 'var(--color-bg-base)' }}>
+      <div 
+        ref={scrollContainerRef}
+        className="overflow-x-auto scrollbar-hide" 
+        style={{ backgroundColor: 'var(--color-bg-base)' }}
+      >
         <table 
           className="border-collapse"
           style={{ width: 'auto' }}
@@ -126,10 +136,11 @@ const EpisodeMatrixView = ({ seasonsData, baseSeasonInfo, onEpisodeClick }) => {
                     return (
                       <td 
                         key={`${seasonNumber}-${episodeNumber}`}
-                        className="p-2 w-20"
+                        className="p-2 w-20 h-20"
                         style={{ 
                           backgroundColor: 'var(--color-bg-base)',
-                          width: '5rem'
+                          width: '5rem',
+                          height: '5rem'
                         }}
                       >
                         {episode ? (
@@ -145,7 +156,7 @@ const EpisodeMatrixView = ({ seasonsData, baseSeasonInfo, onEpisodeClick }) => {
                           />
                         ) : (
                           // Empty cell - no episode exists
-                          <div className="w-full h-12"></div>
+                          <div className="w-full h-full"></div>
                         )}
                       </td>
                     );
