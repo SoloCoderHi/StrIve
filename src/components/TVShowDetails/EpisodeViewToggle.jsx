@@ -1,5 +1,5 @@
 import React from 'react';
-import { List, LayoutGrid } from 'lucide-react';
+import { List, LayoutGrid, Table } from 'lucide-react';
 
 const EpisodeViewToggle = ({ viewMode, setViewMode }) => {
   const baseStyle = "p-2 rounded-md transition-colors duration-150 focus-accent cursor-pointer";
@@ -25,6 +25,15 @@ const EpisodeViewToggle = ({ viewMode, setViewMode }) => {
         type="button"
       >
         <LayoutGrid className="w-5 h-5" />
+      </button>
+      <button
+        aria-label="Switch to Matrix View"
+        aria-pressed={viewMode === 'matrix'}
+        onClick={() => setViewMode('matrix')}
+        className={`${baseStyle} ${viewMode === 'matrix' ? activeStyle : inactiveStyle}`}
+        type="button"
+      >
+        <Table className="w-5 h-5" />
       </button>
     </div>
   );

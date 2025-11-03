@@ -54,6 +54,7 @@ const useTvShowDetails = (tvId) => {
         voteCount: tmdbData.vote_count,
         logos: tmdbData.images?.logos?.map(l => ({ filePath: l.file_path, aspectRatio: l.aspect_ratio })) || [],
         imdbId: tmdbData.external_ids?.imdb_id || null,
+        seasons: tmdbData.seasons || [],
       };
       
       setData(normalized);

@@ -1,6 +1,22 @@
 import React from "react";
 import { Star, ExternalLink } from "lucide-react";
 
+const formatVoteCount = (count) => {
+  if (!count) return '';
+  
+  if (count >= 1000000) {
+    const millions = count / 1000000;
+    return millions % 1 === 0 ? `${millions}m` : `${millions.toFixed(1)}m`;
+  }
+  
+  if (count >= 1000) {
+    const thousands = count / 1000;
+    return thousands % 1 === 0 ? `${thousands}k` : `${thousands.toFixed(1)}k`;
+  }
+  
+  return count.toString();
+};
+
 const QuickInfoPanel = ({ showDetails }) => {
   const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(showDetails.name + ' TV show')}`;
 
@@ -27,7 +43,7 @@ const QuickInfoPanel = ({ showDetails }) => {
               </span>
               {showDetails.voteCount && (
                 <span style={{ color: 'var(--color-text-tertiary)' }}>
-                  ({showDetails.voteCount.toLocaleString()} votes)
+                  ({formatVoteCount(showDetails.voteCount)} votes)
                 </span>
               )}
             </div>
@@ -48,7 +64,7 @@ const QuickInfoPanel = ({ showDetails }) => {
               </span>
               {showDetails.imdbVotes && (
                 <span style={{ color: 'var(--color-text-tertiary)' }}>
-                  ({showDetails.imdbVotes.toLocaleString()} votes)
+                  ({formatVoteCount(showDetails.imdbVotes)} votes)
                 </span>
               )}
             </div>

@@ -107,10 +107,13 @@ const SearchPage = () => {
                   const movie = {
                     id: result.id,
                     poster_path: result.poster_path, // TMDB field for poster
+                    title: result.title, // Movie title
+                    name: result.name, // TV show name
                     original_title: result.title || result.name, // Use title for movies, name for TV shows
-                    release_date: result.release_date || result.first_air_date, // Use release_date for movies, first_air_date for TV shows
+                    release_date: result.release_date, // Movie release date
+                    first_air_date: result.first_air_date, // TV show first air date
                     vote_average: result.vote_average, // TMDB rating
-                    mediaType: mediaType // Specify if it's a movie or tv show
+                    media_type: mediaType // Specify if it's a movie or tv show
                   };
 
                   return <MovieCard key={result.id} movie={movie} />;

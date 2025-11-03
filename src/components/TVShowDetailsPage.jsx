@@ -8,6 +8,7 @@ import useTvSeasonEpisodes from "../hooks/useTvSeasonEpisodes";
 import useTvVideos from "../hooks/useTvVideos";
 import useRequireAuth from "../hooks/useRequireAuth";
 import { addToList } from "../util/firestoreService";
+import { options } from "../util/constants";
 import EpisodeOverlay from "./EpisodeOverlay";
 import SeasonTabs from "./SeasonTabs";
 import QuickInfoPanel from "./QuickInfoPanel";
@@ -15,6 +16,7 @@ import EpisodeViewToggle from "./TVShowDetails/EpisodeViewToggle";
 import EpisodeListItem from "./TVShowDetails/EpisodeListItem";
 import EpisodeCard from "./TVShowDetails/EpisodeCard";
 import SimilarShowsPanel from "./TVShowDetails/SimilarShowsPanel";
+import EpisodeMatrixView from "./TVShowDetails/EpisodeMatrixView";
 
 const IMG_CDN_URL = "https://image.tmdb.org/t/p";
 
@@ -32,6 +34,8 @@ const TVShowDetailsPage = () => {
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [addingToWatchlist, setAddingToWatchlist] = useState(false);
   const [viewMode, setViewMode] = useState('list');
+  const [allSeasonsData, setAllSeasonsData] = useState(null);
+  const [isLoadingMatrix, setIsLoadingMatrix] = useState(false);
 
   const { data: seasonData, loading: episodesLoading } = useTvSeasonEpisodes(
     tvId,
@@ -44,6 +48,41 @@ const TVShowDetailsPage = () => {
       setSelectedSeason(1);
     }
   }, [showDetails]);
+
+  // Fetch all seasons data for matrix view
+  const fetchAllSeasonDetails = async () => {
+    if (!showDetails || !showDetails.numberOfSeasons) return;
+
+    setIsLoadingMatrix(true);
+    try {
+      const validSeasons = Array.from(
+        { length: showDetails.numberOfSeasons }, 
+        (_, i) => i + 1
+      );
+
+      const seasonPromises = validSeasons.map((seasonNum) =>
+        fetch(
+          `https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?language=en-US`,
+          options
+        ).then(res => res.json())
+      );
+
+      const seasonsData = await Promise.all(seasonPromises);
+      setAllSeasonsData(seasonsData);
+    } catch (error) {
+      console.error("Error fetching all seasons data:", error);
+      setAllSeasonsData([]);
+    } finally {
+      setIsLoadingMatrix(false);
+    }
+  };
+
+  // Load all seasons when matrix view is selected
+  useEffect(() => {
+    if (viewMode === 'matrix' && allSeasonsData === null && showDetails) {
+      fetchAllSeasonDetails();
+    }
+  }, [viewMode, allSeasonsData, showDetails]);
 
   // Find trailer
   const trailer = videos?.find(
@@ -305,50 +344,81 @@ const TVShowDetailsPage = () => {
                 <EpisodeViewToggle viewMode={viewMode} setViewMode={setViewMode} />
               </div>
 
-              {/* Season Tabs */}
-              <SeasonTabs
-                totalSeasons={showDetails.numberOfSeasons}
-                selectedSeason={selectedSeason}
-                onSeasonChange={setSelectedSeason}
-              />
+              {/* Season Tabs - Only show for list/grid view */}
+              {viewMode !== 'matrix' && (
+                <SeasonTabs
+                  totalSeasons={showDetails.numberOfSeasons}
+                  selectedSeason={selectedSeason}
+                  onSeasonChange={setSelectedSeason}
+                />
+              )}
 
               {/* Episodes Section with Region Role */}
               <div className="mt-6" role="region" aria-label="Episodes">
-                {episodesLoading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-4"
-                      style={{ borderColor: 'var(--color-accent-primary)' }}></div>
-                  </div>
-                ) : seasonData?.episodes && seasonData.episodes.length > 0 ? (
-                  viewMode === 'list' ? (
-                    // List View - Vertical scrolling container
-                    <div className="grid grid-cols-1 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
-                      {seasonData.episodes.map((episode) => (
-                        <EpisodeListItem
-                          key={episode.id}
-                          episode={episode}
-                          onClick={() => handleEpisodeClick(episode)}
-                        />
-                      ))}
+                {viewMode === 'matrix' ? (
+                  // Matrix View - Show all seasons
+                  isLoadingMatrix ? (
+                    <div className="flex justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-4 mx-auto"
+                          style={{ borderColor: 'var(--color-accent-primary)' }}></div>
+                        <p className="mt-4" style={{ color: 'var(--color-text-secondary)' }}>
+                          Loading all season data...
+                        </p>
+                      </div>
                     </div>
+                  ) : allSeasonsData ? (
+                    <EpisodeMatrixView 
+                      seasonsData={allSeasonsData}
+                      baseSeasonInfo={showDetails.seasons || []}
+                      onEpisodeClick={(episode, seasonNumber) => {
+                        setSelectedSeason(seasonNumber);
+                        handleEpisodeClick(episode);
+                      }}
+                    />
                   ) : (
-                    // Grid View - Fixed at 3 episodes per row
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
-                      {seasonData.episodes.map((episode) => (
-                        <EpisodeCard
-                          key={episode.id}
-                          episode={episode}
-                          onClick={() => handleEpisodeClick(episode)}
-                        />
-                      ))}
+                    <div className="text-center py-12">
+                      <p className="text-red-500">Could not load matrix data.</p>
                     </div>
                   )
                 ) : (
-                  <div className="text-center py-12">
-                    <p style={{ color: 'var(--color-text-secondary)' }}>
-                      No episodes available for this season
-                    </p>
-                  </div>
+                  // List/Grid View - Show selected season
+                  episodesLoading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-4"
+                        style={{ borderColor: 'var(--color-accent-primary)' }}></div>
+                    </div>
+                  ) : seasonData?.episodes && seasonData.episodes.length > 0 ? (
+                    viewMode === 'list' ? (
+                      // List View - Vertical scrolling container
+                      <div className="grid grid-cols-1 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
+                        {seasonData.episodes.map((episode) => (
+                          <EpisodeListItem
+                            key={episode.id}
+                            episode={episode}
+                            onClick={() => handleEpisodeClick(episode)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      // Grid View - Fixed at 3 episodes per row
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[850px] overflow-y-auto scrollbar-hide">
+                        {seasonData.episodes.map((episode) => (
+                          <EpisodeCard
+                            key={episode.id}
+                            episode={episode}
+                            onClick={() => handleEpisodeClick(episode)}
+                          />
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center py-12">
+                      <p style={{ color: 'var(--color-text-secondary)' }}>
+                        No episodes available for this season
+                      </p>
+                    </div>
+                  )
                 )}
               </div>
             </div>
