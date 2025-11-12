@@ -5,12 +5,10 @@ import MovieCard from "./MovieCard";
 import usePopularMovies from "../hooks/usePopularMovies";
 import useTopRatedMovies from "../hooks/useTopRatedMovies";
 import useUpcomingMovies from "../hooks/useUpcomingMovies";
-import { Star, Flame, Calendar, Play } from "lucide-react";
 
 const MoviesPage = () => {
   const movies = useSelector((store) => store.movies);
 
-  // Fetch movies data
   usePopularMovies();
   useTopRatedMovies();
   useUpcomingMovies();
@@ -19,12 +17,14 @@ const MoviesPage = () => {
     if (!movies || movies.length === 0) return null;
 
     return (
-      <div className="mb-8">
-        <h2 className="text-white text-2xl font-bold mb-4 px-12 flex items-center gap-2">
-          {icon}
-          {title}
-        </h2>
-        <div className="flex overflow-x-scroll scrollbar-hide px-12 pb-4">
+      <div className="mb-12">
+        <div className="mb-6">
+          <h2 className="text-white text-2xl lg:text-3xl font-bold font-secondary flex items-center gap-3">
+            <span className="material-symbols-outlined text-3xl text-red-600">{icon}</span>
+            {title}
+          </h2>
+        </div>
+        <div className="flex overflow-x-scroll scrollbar-hide gap-4 pb-4">
           {movies.map((movie) => (
             <MovieCard
               key={movie.id}
@@ -37,39 +37,43 @@ const MoviesPage = () => {
   };
 
   return (
-    <div className="bg-black min-h-screen">
+    <div className="min-h-screen premium-page">
       <Header />
       
-      {/* Hero Section */}
-      <div className="pt-20 pb-8 px-12">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-            <Play className="w-12 h-12 text-red-500" />
+      <div className="pt-24 pb-12 px-6 lg:px-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="flex justify-center mb-6">
+            <div className="glass-effect p-6 rounded-full">
+              <span className="material-symbols-outlined text-7xl gradient-accent">
+                movie
+              </span>
+            </div>
+          </div>
+          <h1 className="font-display text-6xl lg:text-7xl font-bold gradient-text mb-6">
             Movies
           </h1>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+          <p className="text-xl text-white/60 font-secondary max-w-2xl mx-auto">
             Discover amazing movies from around the world. Watch your favorites
             anytime, anywhere.
           </p>
         </div>
       </div>
 
-      {/* Movie Lists */}
-      <div className="relative bg-black pb-20">
+      <div className="w-full px-6 lg:px-12 pb-20">
         <MovieList
           title="Popular Movies"
           movies={movies.popularMovies}
-          icon={<Flame className="w-6 h-6 text-orange-500" />}
+          icon="trending_up"
         />
         <MovieList
           title="Top Rated"
           movies={movies.topRatedMovies}
-          icon={<Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />}
+          icon="star"
         />
         <MovieList
           title="Upcoming"
           movies={movies.upcomingMovies}
-          icon={<Calendar className="w-6 h-6 text-blue-400" />}
+          icon="event"
         />
       </div>
     </div>

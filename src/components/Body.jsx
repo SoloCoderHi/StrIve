@@ -12,6 +12,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import MyListPage from "./MyListPage"; // Import MyListPage
 import MyListsPage from "./MyListsPage"; // Import MyListsPage
 import ListDetailsPage from "./ListDetailsPage"; // Import ListDetailsPage
+import ImportPage from "./ImportPage"; // Import ImportPage
 import ImportReviewPage from "./ImportReviewPage"; // Import ImportReviewPage
 import { RouterProvider } from "react-router-dom";
 import Footer from "./Footer";
@@ -75,11 +76,15 @@ const Body = () => {
       ),
     },
     {
-      path: "/import", // Redirect legacy /import to /my-lists
-      element: <Navigate to="/my-lists" replace />,
+      path: "/import", // Import CSV page
+      element: (
+        <ProtectedRoute>
+          <ImportPage />
+        </ProtectedRoute>
+      ),
     },
     {
-      path: "/import/review", // Add new route for import review page
+      path: "/import/review", // Import review page
       element: (
         <ProtectedRoute>
           <ImportReviewPage />

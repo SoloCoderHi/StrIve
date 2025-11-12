@@ -5,12 +5,10 @@ import TVShowCard from "./TVShowCard";
 import usePopularTVShows from "../hooks/usePopularTVShows";
 import useTopRatedTVShows from "../hooks/useTopRatedTVShows";
 import useOnTheAirTVShows from "../hooks/useOnTheAirTVShows";
-import { Radio, Flame, Star, Tv } from "lucide-react";
 
 const TVShows = () => {
   const tvShows = useSelector((store) => store.tvShows);
 
-  // Fetch TV shows data
   usePopularTVShows();
   useTopRatedTVShows();
   useOnTheAirTVShows();
@@ -19,12 +17,14 @@ const TVShows = () => {
     if (!shows || shows.length === 0) return null;
 
     return (
-      <div className="mb-8">
-        <h2 className="text-white text-2xl font-bold mb-4 px-12 flex items-center gap-2">
-          {icon}
-          {title}
-        </h2>
-        <div className="flex overflow-x-scroll scrollbar-hide px-12 pb-4">
+      <div className="mb-12">
+        <div className="mb-6">
+          <h2 className="text-white text-2xl lg:text-3xl font-bold font-secondary flex items-center gap-3">
+            <span className="material-symbols-outlined text-3xl text-red-600">{icon}</span>
+            {title}
+          </h2>
+        </div>
+        <div className="flex overflow-x-scroll scrollbar-hide gap-4 pb-4">
           {shows.map((tvShow) => (
             <TVShowCard
               key={tvShow.id}
@@ -37,39 +37,43 @@ const TVShows = () => {
   };
 
   return (
-    <div className="bg-black min-h-screen">
+    <div className="min-h-screen premium-page">
       <Header />
 
-      {/* Hero Section */}
-      <div className="pt-20 pb-8 px-12">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-            <Tv className="w-12 h-12 text-green-500" />
+      <div className="pt-24 pb-12 px-6 lg:px-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="flex justify-center mb-6">
+            <div className="glass-effect p-6 rounded-full">
+              <span className="material-symbols-outlined text-7xl gradient-accent">
+                tv
+              </span>
+            </div>
+          </div>
+          <h1 className="font-display text-6xl lg:text-7xl font-bold gradient-text mb-6">
             TV Shows
           </h1>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+          <p className="text-xl text-white/60 font-secondary max-w-2xl mx-auto">
             Discover amazing TV series from around the world. Binge-watch your
             favorite shows anytime, anywhere.
           </p>
         </div>
       </div>
 
-      {/* TV Show Lists */}
-      <div className="relative bg-black pb-20">
+      <div className="w-full px-6 lg:px-12 pb-20">
         <TVShowList
           title="On The Air"
           shows={tvShows.onTheAirTVShows}
-          icon={<Radio className="w-6 h-6 text-red-500" />}
+          icon="live_tv"
         />
         <TVShowList
           title="Popular TV Shows"
           shows={tvShows.popularTVShows}
-          icon={<Flame className="w-6 h-6 text-orange-500" />}
+          icon="trending_up"
         />
         <TVShowList
           title="Top Rated"
           shows={tvShows.topRatedTVShows}
-          icon={<Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />}
+          icon="star"
         />
       </div>
     </div>

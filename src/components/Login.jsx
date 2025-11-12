@@ -13,12 +13,12 @@ import { login } from "../util/userSlice";
 
 const Login = () => {
   const [IsSignin, setIsSignin] = useState(true);
-
   const [ErrorMsg, setErrorMsg] = useState(null);
-  // const [email, setEmail] = useState("");
-  // const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
   const toogleSignup = () => {
     setIsSignin(!IsSignin);
+    setErrorMsg(null);
   };
 
   const Navigate = useNavigate();
@@ -35,31 +35,27 @@ const Login = () => {
     if (error) {
       return;
     }
+    
+    setIsLoading(true);
+    
     if (IsSignin) {
-      // Sign in with email and password
       signInWithEmailAndPassword(
         auth,
         email.current.value,
         password.current.value
       )
         .then((userCredential) => {
-          // Signed in
           const user = userCredential.user;
-          console.log(user);
-          
-          // Dispatch login action to update Redux store
           dispatch(login({ uid: user.uid, email: user.email, name: user.displayName }));
-          
           Navigate("/");
         })
         .catch((error) => {
-          // console.log(error); // log the full error
           const errorCode = error.code;
           const errorMessage = error.message;
           setErrorMsg(errorCode + " " + errorMessage);
-        });
+        })
+        .finally(() => setIsLoading(false));
     } else {
-      // Create user account
       createUserWithEmailAndPassword(auth, emailVal, passwordVal)
         .then((userCredential) => {
           const user = userCredential.user;
@@ -68,103 +64,155 @@ const Login = () => {
             photoURL: "https://example.com/jane-q-user/profile.jpg",
           })
             .then(() => {
-              // Profile updated!
               const { uid, email, displayName } = auth.currentUser;
-
               dispatch(login({ uid: uid, email: email, name: displayName }));
-              // console.log(user);
               Navigate("/");
             })
             .catch((error) => {
-              // An error occurred
               setErrorMsg(error.message);
             });
         })
         .catch((error) => {
-          // console.log(error); // log the full error
           const errorCode = error.code;
           const errorMessage = error.message;
           setErrorMsg(errorCode + " " + errorMessage);
-        });
+        })
+        .finally(() => setIsLoading(false));
     }
   };
 
-  // const handleEmailChange = (e) => {
-  //   setEmail(e.target.value);
-  // };
-
-  // const handlePasswordChange = (e) => {
-  //   setPassword(e.target.value);
-  // };
-
-  // const handleSubmit = (e) => {
-  //   e.preventDefault();
-      //validate the form data
-      // checkvaliddata(email,password);
-  //   console.log(email, password);
-  // };
-
   return (
-    <div>
+    <div className="min-h-screen relative overflow-hidden">
       <Header />
-      <div className="absolute">
+      
+      <div className="absolute inset-0 z-0">
         <img
           src="https://assets.nflxext.com/ffe/siteui/vlv3/202ac35e-1fca-44f0-98d9-ea7e8211a07c/web/IN-en-20250512-TRIFECTA-perspective_688b8c03-78cb-46a6-ac1c-1035536f871a_large.jpg"
           alt="Background"
-          className="w-screen h-screen object-cover"
+          className="w-full h-full object-cover"
         />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-black/80"></div>
       </div>
 
-      <form
-        className="absolute bg-black w-3/12 my-60 right-0 left-0 mx-auto p-6 rounded-lg text-white opacity-80"
-        onSubmit={(e) => e.preventDefault()}
-      >
-        <h1 className="text-3xl font-bold p-2 m-2">
-          {IsSignin ? "Sign In" : "Sign Up"}
-        </h1>
-        {!IsSignin && (
-          <input
-            ref={name}
-            className="p-4 my-4 rounded-lg  w-full bg-gray-700"
-            type="text"
-            placeholder="Full Name"
-          />
-        )}
-        <input
-          ref={email}
-          className="p-4 my-4 rounded-lg  w-full bg-gray-700"
-          type="email"
-          placeholder="Email"
-          // value={email}
-          // onChange={handleEmailChange}
-        />
-
-        <input
-          ref={password}
-          className="p-4 my-4 rounded-lg w-full bg-gray-700"
-          type="password"
-          placeholder="Password"
-          // value={password}
-          // onChange={handlePasswordChange}
-        />
-        <p className="text-xs text-red-500 bold"> {ErrorMsg}</p>
-        <button
-          onClick={handleButtonclick}
-          className="p-4 my-6 rounded-lg bg-red-600 hover:bg-red-700 cursor-pointer w-full"
-          type="submit"
+      <div className="relative z-10 flex items-center justify-center min-h-screen px-4 pt-20">
+        <form
+          className="w-full max-w-md glass-effect p-8 md:p-12 rounded-3xl shadow-2xl animate-fade-in"
+          onSubmit={(e) => e.preventDefault()}
         >
-          {IsSignin ? "Sign In" : "Sign Up"}
-        </button>
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <span className="material-symbols-outlined text-6xl gradient-accent">
+                account_circle
+              </span>
+            </div>
+            <h1 className="font-display text-4xl font-bold text-white mb-2">
+              {IsSignin ? "Welcome Back" : "Join Strive"}
+            </h1>
+            <p className="text-white/60 font-secondary text-sm">
+              {IsSignin ? "Sign in to continue your journey" : "Create your account to get started"}
+            </p>
+          </div>
 
-        <p
-          onClick={toogleSignup}
-          className="text-sm p-4 hover:underline cursor-pointer "
-        >
-          {IsSignin
-            ? "New to Netflix? Sign up now."
-            : "Already have an account? Sign in."}
-        </p>
-      </form>
+          {!IsSignin && (
+            <div className="mb-5">
+              <label className="block text-white/80 text-sm font-semibold mb-2 font-secondary">
+                Full Name
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/40">
+                  person
+                </span>
+                <input
+                  ref={name}
+                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-red-600 focus:bg-white/10 transition-all font-secondary"
+                  type="text"
+                  placeholder="Enter your full name"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="mb-5">
+            <label className="block text-white/80 text-sm font-semibold mb-2 font-secondary">
+              Email Address
+            </label>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/40">
+                mail
+              </span>
+              <input
+                ref={email}
+                className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-red-600 focus:bg-white/10 transition-all font-secondary"
+                type="email"
+                placeholder="Enter your email"
+              />
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-white/80 text-sm font-semibold mb-2 font-secondary">
+              Password
+            </label>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/40">
+                lock
+              </span>
+              <input
+                ref={password}
+                className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-red-600 focus:bg-white/10 transition-all font-secondary"
+                type="password"
+                placeholder="Enter your password"
+              />
+            </div>
+          </div>
+
+          {ErrorMsg && (
+            <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-3">
+              <span className="material-symbols-outlined text-red-400">
+                error
+              </span>
+              <p className="text-sm text-red-400 font-secondary">{ErrorMsg}</p>
+            </div>
+          )}
+
+          <button
+            onClick={handleButtonclick}
+            className="w-full btn-primary py-4 text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            type="submit"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <span className="material-symbols-outlined animate-spin">
+                  progress_activity
+                </span>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined">
+                  {IsSignin ? 'login' : 'person_add'}
+                </span>
+                <span>{IsSignin ? "Sign In" : "Create Account"}</span>
+              </>
+            )}
+          </button>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={toogleSignup}
+              className="text-white/80 hover:text-white text-sm font-secondary transition-colors"
+            >
+              {IsSignin
+                ? "Don't have an account? "
+                : "Already have an account? "}
+              <span className="text-red-400 font-semibold">
+                {IsSignin ? "Sign up now" : "Sign in"}
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

@@ -5,7 +5,6 @@ import useSearch from '../hooks/useSearch';
 const SearchPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Initialize from URL parameter only on first load
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('q');
@@ -16,122 +15,155 @@ const SearchPage = () => {
 
   const { results, loading, error } = useSearch(searchTerm);
 
-  // Handle input changes
   const handleInputChange = (e) => {
     setSearchTerm(e.target.value);
   };
 
-  // Handle clear search
   const handleClearSearch = () => {
     setSearchTerm('');
-    // Update URL to remove query param
     window.history.replaceState({}, '', '/search');
   };
 
-  // Handle form submission (when Enter is pressed)
   const handleSubmit = (e) => {
     e.preventDefault();
-    // The search is handled by the useSearch hook automatically when searchTerm changes
   };
 
   return (
-    <div className="bg-black min-h-screen">
-      <div className="px-12 py-8">
+    <div className="min-h-screen premium-page pt-24">
+      <div className="premium-container py-8">
         <div className="mb-12 text-center">
-          <h1 className="text-5xl font-bold text-white mb-4">Search</h1>
-          <p className="text-gray-400 text-xl">Find your next favorite movie or TV show</p>
+          <div className="flex justify-center mb-4">
+            <span className="material-symbols-outlined text-7xl gradient-accent">
+              search
+            </span>
+          </div>
+          <h1 className="font-display text-6xl font-bold gradient-text mb-4">
+            Discover
+          </h1>
+          <p className="text-white/60 font-secondary text-lg">
+            Find your next favorite movie or TV show
+          </p>
         </div>
 
-        {/* Search Input Section */}
-        <div className="max-w-2xl mx-auto mb-16">
+        <div className="max-w-3xl mx-auto mb-16">
           <form onSubmit={handleSubmit} className="relative">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={handleInputChange}
-              placeholder="Search for movies, TV shows, actors..."
-              className="w-full px-6 py-4 bg-gray-900 text-white rounded-lg border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            )}
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-6 top-1/2 -translate-y-1/2 text-white/40 text-3xl">
+                search
+              </span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleInputChange}
+                placeholder="Search for movies, TV shows, actors..."
+                className="w-full pl-20 pr-16 py-6 glass-effect text-white text-lg rounded-2xl border border-white/10 focus:outline-none focus:border-red-600 focus:bg-white/10 transition-all placeholder-white/40 font-secondary"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 glass-effect hover:bg-white/20 text-white rounded-full p-2 transition-all"
+                  aria-label="Clear search"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
-        {/* Results Section - Only show if there's a search term */}
         {searchTerm && (
           <div className="mb-16">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-bold text-white">
-                Search Results for "{searchTerm}"
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+              <h3 className="text-2xl lg:text-3xl font-bold text-white font-secondary">
+                Results for <span className="gradient-accent">"{searchTerm}"</span>
               </h3>
-              <p className="text-gray-400">
-                {results.length} {results.length === 1 ? 'result' : 'results'} found
-              </p>
+              <div className="glass-effect px-4 py-2 rounded-full">
+                <p className="text-white/80 font-secondary text-sm">
+                  <span className="font-bold text-red-400">{results.length}</span> {results.length === 1 ? 'result' : 'results'} found
+                </p>
+              </div>
             </div>
 
             {error && (
-              <div className="text-center py-12">
-                <p className="text-red-500 text-lg">Error: {error}</p>
+              <div className="text-center py-12 glass-effect rounded-2xl">
+                <span className="material-symbols-outlined text-6xl text-red-400 mb-4">
+                  error
+                </span>
+                <p className="text-red-400 text-lg font-secondary">Error: {error}</p>
               </div>
             )}
 
             {loading ? (
-              // Loading state - skeleton grid
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                {[...Array(12)].map((_, index) => (
-                  <div key={index} className="bg-gray-800 rounded-lg overflow-hidden animate-pulse">
-                    <div className="w-full h-64 bg-gray-700"></div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {[...Array(10)].map((_, index) => (
+                  <div key={index} className="glass-effect rounded-2xl overflow-hidden animate-pulse">
+                    <div className="w-full h-80 bg-white/5"></div>
                     <div className="p-4">
-                      <div className="h-4 bg-gray-700 rounded mb-2"></div>
-                      <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                      <div className="h-4 bg-white/5 rounded mb-2"></div>
+                      <div className="h-3 bg-white/5 rounded w-2/3"></div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : results.length > 0 ? (
-              // Results grid
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {results.map((result) => {
-                  // Map TMDB API fields to MovieCard expected fields
-                  // Determine if this is a movie or TV show based on media_type
                   const mediaType = result.media_type;
-
-                  // Use appropriate fields based on media type
                   const movie = {
                     id: result.id,
-                    poster_path: result.poster_path, // TMDB field for poster
-                    title: result.title, // Movie title
-                    name: result.name, // TV show name
-                    original_title: result.title || result.name, // Use title for movies, name for TV shows
-                    release_date: result.release_date, // Movie release date
-                    first_air_date: result.first_air_date, // TV show first air date
-                    vote_average: result.vote_average, // TMDB rating
-                    media_type: mediaType // Specify if it's a movie or tv show
+                    poster_path: result.poster_path,
+                    title: result.title,
+                    name: result.name,
+                    original_title: result.title || result.name,
+                    release_date: result.release_date,
+                    first_air_date: result.first_air_date,
+                    vote_average: result.vote_average,
+                    media_type: mediaType
                   };
 
                   return <MovieCard key={result.id} movie={movie} />;
                 })}
               </div>
             ) : (
-              // No results found
-              <div className="text-center py-12">
-                <p className="text-gray-400 text-lg">No results found for your query.</p>
+              <div className="text-center py-16 glass-effect rounded-2xl">
+                <span className="material-symbols-outlined text-7xl text-white/30 mb-4">
+                  search_off
+                </span>
+                <p className="text-white/60 text-xl font-secondary">No results found for your query</p>
+                <p className="text-white/40 text-sm font-secondary mt-2">Try different keywords or check your spelling</p>
               </div>
             )}
           </div>
         )}
 
-        {/* Show suggestions when no search term is entered */}
         {!searchTerm && (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-xl">Enter a search term to find movies and TV shows</p>
+          <div className="text-center py-16">
+            <div className="mb-8 flex justify-center">
+              <div className="glass-effect p-8 rounded-full">
+                <span className="material-symbols-outlined text-8xl gradient-accent">
+                  travel_explore
+                </span>
+              </div>
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-4 font-display">
+              Start Your Journey
+            </h2>
+            <p className="text-white/60 text-lg font-secondary max-w-md mx-auto">
+              Enter a search term above to discover amazing movies and TV shows
+            </p>
+            
+            <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
+              {['Action', 'Comedy', 'Drama', 'Sci-Fi'].map((genre) => (
+                <button
+                  key={genre}
+                  onClick={() => setSearchTerm(genre)}
+                  className="glass-effect hover:bg-white/10 text-white px-6 py-3 rounded-xl transition-all hover:scale-105 font-secondary font-medium"
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

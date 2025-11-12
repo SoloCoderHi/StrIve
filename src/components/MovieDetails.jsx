@@ -5,22 +5,16 @@ import { addToList } from "../util/firestoreService";
 import { addItem } from "../util/listsSlice";
 import { useDispatch } from "react-redux";
 import Header from "./Header";
-import { Play, Plus, Star, RotateCcw } from "lucide-react";
 import useRequireAuth from "../hooks/useRequireAuth";
 import useImdbTitle from "../hooks/useImdbTitle";
 import MoviePlayer from "./MoviePlayer";
 import AddToListPopover from "./AddToListPopover";
 import CreateListModal from "./CreateListModal";
 
-// Helper function to format large numbers
 const formatCount = (num) => {
   if (num === null || num === undefined) return 'N/A';
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M';
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k';
-  }
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
   return num.toString();
 };
 
@@ -35,25 +29,19 @@ const MovieDetails = () => {
   const user = useRequireAuth();
   const dispatch = useDispatch();
   
-  // Determine which ID to use - if imdbId param exists, use it; otherwise use movieId
   const currentId = imdbId || movieId;
-  const mediaType = currentId && currentId.startsWith('tt') ? "movie" : "movie";  // For movies, it's always "movie"
-  
-  // Get IMDb data for this movie using the new hook
+  const mediaType = currentId && currentId.startsWith('tt') ? "movie" : "movie";
   const { data: imdbData, loading: imdbLoading } = useImdbTitle(currentId, mediaType);
 
   const fetchMovieDetails = useCallback(async () => {
     try {
       setLoading(true);
-
-      // Fetch detailed movie information using TMDB ID with images
       const response = await fetch(
-        `https://api.themoviedb.org/3/movie/${movieId}?language=en-US&append_to_response=images&include_image_language=en,null`,
+        `https://api.themoviedb.org/3/movie/${movieId}?language=en-US&append_to_response=images,credits,similar&include_image_language=en,null`,
         options
       );
       const movieData = await response.json();
       setMovieDetails(movieData);
-
       setLoading(false);
     } catch (error) {
       console.error("Error fetching movie details:", error);
@@ -143,10 +131,10 @@ const MovieDetails = () => {
 
   if (loading) {
     return (
-      <div className="bg-black min-h-screen flex items-center justify-center">
+      <div className="min-h-screen premium-page flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-red-600 mx-auto"></div>
-          <div className="mt-4 text-white text-lg">Loading Movie Details...</div>
+          <div className="animate-spin rounded-full h-20 w-20 border-4 border-white/20 border-t-red-600 mx-auto"></div>
+          <div className="mt-6 text-white text-lg font-secondary">Loading Movie Details...</div>
         </div>
       </div>
     );
@@ -154,14 +142,18 @@ const MovieDetails = () => {
 
   if (!movieDetails) {
     return (
-      <div className="bg-black min-h-screen flex items-center justify-center">
+      <div className="min-h-screen premium-page flex items-center justify-center">
         <div className="text-center">
-          <div className="text-white text-2xl">Movie not found</div>
+          <span className="material-symbols-outlined text-8xl text-white/30 mb-4">
+            movie_off
+          </span>
+          <div className="text-white text-2xl font-display mb-6">Movie not found</div>
           <button
             onClick={() => window.history.back()}
-            className="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded"
+            className="btn-primary"
           >
-            Go Back
+            <span className="material-symbols-outlined">arrow_back</span>
+            <span>Go Back</span>
           </button>
         </div>
       </div>
@@ -169,157 +161,257 @@ const MovieDetails = () => {
   }
 
   return (
-    <div className="bg-black min-h-screen">
+    <div className="min-h-screen premium-page">
       <Header />
       
-      {/* Background Image */}
-      <div
-        className="relative h-screen bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: `url(https://image.tmdb.org/t/p/original${movieDetails.backdrop_path})`,
-        }}
-      >
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent"></div>
+      {/* Hero Section with Backdrop */}
+      <div className="relative h-screen">
+        {/* Background Image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: `url(https://image.tmdb.org/t/p/original${movieDetails.backdrop_path})`,
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/50"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent"></div>
+        </div>
 
         {/* Content */}
-        <div className="absolute bottom-0 left-0 right-0 p-12 z-10">
-          <div className="max-w-4xl">
-            {/* Title Logo or Text */}
-            {movieDetails.images?.logos?.length > 0 ? (
-              <div className="mb-4">
-                <img 
-                  src={`https://image.tmdb.org/t/p/w500${movieDetails.images.logos[0].file_path}`}
-                  alt={`${movieDetails.title} Logo`}
-                  className="max-w-full h-auto max-h-32 object-contain"
-                />
-              </div>
-            ) : (
-              <h1 className="text-6xl font-bold text-white mb-4 drop-shadow-2xl">
-                {movieDetails.title}
-              </h1>
-            )}
-
-            {/* Rating Section with Progressive Loading */}
-            <div className="mb-6">
-              {/* Multi-source Rating Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mb-4">
-                {/* TMDB Rating Card */}
-                <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg p-3 text-center">
-                  <div className="text-xs text-gray-400 uppercase tracking-wider">TMDB</div>
-                  <div className="text-xl font-bold text-white mt-1">
-                    {movieDetails.vote_average?.toFixed(1) || 'N/A'}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {movieDetails.vote_count ? `${formatCount(movieDetails.vote_count)} votes` : 'User Rating'}
-                  </div>
+        <div className="relative z-10 h-full flex items-end">
+          <div className="w-full px-6 lg:px-12 pb-20">
+            <div className="max-w-5xl">
+              {/* Title Logo or Text */}
+              {movieDetails.images?.logos?.length > 0 ? (
+                <div className="mb-6">
+                  <img 
+                    src={`https://image.tmdb.org/t/p/w500${movieDetails.images.logos[0].file_path}`}
+                    alt={`${movieDetails.title} Logo`}
+                    className="max-w-full h-auto max-h-40 object-contain drop-shadow-2xl"
+                  />
                 </div>
-                
-                {/* IMDb Rating Card */}
-                <div className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg p-3 text-center">
-                  <div className="text-xs text-gray-400 uppercase tracking-wider">IMDb</div>
-                  <div className="text-xl font-bold text-white mt-1">
+              ) : (
+                <h1 className="font-display text-6xl lg:text-7xl font-bold text-white mb-6 drop-shadow-2xl">
+                  {movieDetails.title}
+                </h1>
+              )}
+
+              {/* Ratings - Professional Display with Votes */}
+              <div className="mb-6">
+                {/* Multi-source Rating Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mb-3">
+                  {/* TMDB Rating Card */}
+                  <div className="glass-effect p-3 rounded-xl text-center border border-white/10">
+                    <div className="text-xs text-white/50 uppercase tracking-wider font-secondary mb-1">TMDB Rating</div>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className="material-symbols-outlined text-yellow-400 text-xl">star</span>
+                      <span className="text-white font-bold font-secondary text-2xl">
+                        {movieDetails.vote_average?.toFixed(1)}
+                      </span>
+                      <span className="text-white/60 text-sm">/10</span>
+                    </div>
+                    <div className="text-xs text-white/50 mt-1 font-secondary">
+                      {movieDetails.vote_count ? `${formatCount(movieDetails.vote_count)} votes` : 'User Rating'}
+                    </div>
+                  </div>
+                  
+                  {/* IMDb Rating Card */}
+                  <div className="glass-effect p-3 rounded-xl text-center border border-white/10">
+                    <div className="text-xs text-white/50 uppercase tracking-wider font-secondary mb-1">IMDb Rating</div>
                     {imdbLoading ? (
-                      <div className="h-6 w-8 bg-gray-600 rounded-full animate-pulse mx-auto"></div>
-                    ) : imdbData && imdbData.rating && imdbData.rating.aggregateRating ? (
-                      imdbData.rating.aggregateRating
+                      <div className="flex items-center justify-center gap-1.5 h-8">
+                        <div className="h-6 w-16 bg-white/10 rounded-full animate-pulse"></div>
+                      </div>
+                    ) : imdbData?.rating?.aggregateRating ? (
+                      <>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className="text-yellow-400 font-bold text-xl">⭐</span>
+                          <span className="text-white font-bold font-secondary text-2xl">
+                            {imdbData.rating.aggregateRating}
+                          </span>
+                          <span className="text-white/60 text-sm">/10</span>
+                        </div>
+                        <div className="text-xs text-white/50 mt-1 font-secondary">
+                          {imdbData.rating.voteCount ? `${formatCount(imdbData.rating.voteCount)} votes` : 'User Rating'}
+                        </div>
+                      </>
                     ) : (
-                      'N/A'
+                      <div className="text-white/40 text-sm py-2">Not Available</div>
                     )}
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {imdbData && imdbData.rating && imdbData.rating.voteCount ? 
-                      `${formatCount(imdbData.rating.voteCount)} votes` : 
-                      imdbLoading ? 'Loading...' : 'N/A votes'}
-                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Meta Info */}
-            <div className="flex items-center gap-6 mb-6 text-lg">
-              <span className="text-red-400 font-semibold">
-                {movieDetails.release_date?.split("-")[0]}
-              </span>
-              <span className="text-white">
-                {Math.floor(movieDetails.runtime / 60)}h {movieDetails.runtime % 60}m
-              </span>
-              {movieDetails.status && (
-                <span className="bg-red-600 text-white px-3 py-1 rounded text-sm">
-                  {movieDetails.status}
+              {/* Meta Info */}
+              <div className="flex flex-wrap items-center gap-4 mb-6 text-lg font-secondary">
+                <span className="text-white/90 font-semibold">
+                  {movieDetails.release_date?.split("-")[0]}
                 </span>
-              )}
-            </div>
-
-            <p className="text-xl text-gray-200 mb-8 leading-relaxed max-w-3xl">
-              {movieDetails.overview}
-            </p>
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 mb-6">
-              <button
-                onClick={handlePlayMovie}
-                className="flex items-center gap-2 px-8 py-4 bg-white text-black text-xl font-semibold rounded hover:bg-gray-200 transition-all duration-300 transform hover:scale-105"
-              >
-                <Play className="w-6 h-6" />
-                Play
-              </button>
-
-              <div className="relative">
-                <button
-                  onClick={handleAddToWatchlist}
-                  onMouseEnter={() => setShowPopover(true)}
-                  className="flex items-center gap-2 px-8 py-4 bg-gray-600/80 text-white text-xl font-semibold rounded hover:bg-gray-500/80 transition-all duration-300 transform hover:scale-105"
-                >
-                  <Plus className="w-6 h-6" />
-                  My List
-                </button>
-                
-                {showPopover && (
-                  <div 
-                    onMouseEnter={() => setShowPopover(true)}
-                    onMouseLeave={() => setShowPopover(false)}
-                  >
-                    <AddToListPopover 
-                      onSelectList={handleSelectList}
-                      onCreateNew={handleCreateNew}
-                    />
-                  </div>
+                <span className="text-white/40">•</span>
+                <span className="text-white/90">
+                  {Math.floor(movieDetails.runtime / 60)}h {movieDetails.runtime % 60}m
+                </span>
+                {movieDetails.status && (
+                  <>
+                    <span className="text-white/40">•</span>
+                    <span className="glass-effect px-3 py-1 rounded-full text-sm text-white/90">
+                      {movieDetails.status}
+                    </span>
+                  </>
                 )}
               </div>
-            </div>
 
-            {/* Genres */}
-            {movieDetails.genres && (
-              <div className="flex flex-wrap gap-2">
-                {movieDetails.genres.map((genre) => (
-                  <span
-                    key={genre.id}
-                    className="px-3 py-1 bg-gray-700/50 text-gray-300 rounded-full text-sm"
+              {/* Overview */}
+              <p className="text-xl text-white/80 mb-8 leading-relaxed max-w-3xl font-primary">
+                {movieDetails.overview}
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-4 mb-8">
+                <button
+                  onClick={handlePlayMovie}
+                  className="btn-primary text-lg px-8 py-4 flex items-center gap-3"
+                >
+                  <span className="material-symbols-outlined text-2xl">play_circle</span>
+                  <span>Play Now</span>
+                </button>
+
+                <div className="relative">
+                  <button
+                    onClick={handleAddToWatchlist}
+                    onMouseEnter={() => setShowPopover(true)}
+                    className="btn-secondary text-lg px-8 py-4 flex items-center gap-3"
                   >
-                    {genre.name}
-                  </span>
+                    <span className="material-symbols-outlined text-2xl">add</span>
+                    <span>My List</span>
+                  </button>
+
+                  {showPopover && (
+                    <div
+                      onMouseEnter={() => setShowPopover(true)}
+                      onMouseLeave={() => setShowPopover(false)}
+                    >
+                      <AddToListPopover
+                        onSelectList={handleSelectList}
+                        onCreateNew={handleCreateNew}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Genres */}
+              {movieDetails.genres && (
+                <div className="flex flex-wrap gap-3">
+                  {movieDetails.genres.map((genre) => (
+                    <span
+                      key={genre.id}
+                      className="glass-effect px-4 py-2 rounded-full text-white/80 text-sm font-secondary"
+                    >
+                      {genre.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Info Section */}
+      <div className="w-full px-6 lg:px-12 py-16">
+        <div className="max-w-7xl mx-auto">
+          {/* Cast Section */}
+          {movieDetails.credits?.cast && movieDetails.credits.cast.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold font-display text-white mb-8 flex items-center gap-3">
+                <span className="material-symbols-outlined text-4xl text-red-600">group</span>
+                Cast
+              </h2>
+              <div className="flex overflow-x-scroll scrollbar-hide gap-4 pb-4">
+                {movieDetails.credits.cast.slice(0, 10).map((person) => (
+                  <div key={person.id} className="flex-none w-40">
+                    <div className="premium-card overflow-hidden">
+                      {person.profile_path ? (
+                        <img
+                          src={`https://image.tmdb.org/t/p/w185${person.profile_path}`}
+                          alt={person.name}
+                          className="w-full h-52 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-52 bg-white/5 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-5xl text-white/20">
+                            person
+                          </span>
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <p className="text-white font-semibold text-sm truncate font-secondary">
+                          {person.name}
+                        </p>
+                        <p className="text-white/60 text-xs truncate">
+                          {person.character}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Similar Movies */}
+          {movieDetails.similar?.results && movieDetails.similar.results.length > 0 && (
+            <div>
+              <h2 className="text-3xl font-bold font-display text-white mb-8 flex items-center gap-3">
+                <span className="material-symbols-outlined text-4xl text-red-600">movie_filter</span>
+                Similar Movies
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {movieDetails.similar.results.slice(0, 12).map((movie) => (
+                  movie.poster_path && (
+                    <div
+                      key={movie.id}
+                      onClick={() => navigate(`/movie/${movie.id}`)}
+                      className="cursor-pointer group"
+                    >
+                      <div className="premium-card overflow-hidden">
+                        <img
+                          src={`https://image.tmdb.org/t/p/w342${movie.poster_path}`}
+                          alt={movie.title}
+                          className="w-full h-72 object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        <div className="p-3">
+                          <p className="text-white font-semibold text-sm truncate font-secondary">
+                            {movie.title}
+                          </p>
+                          <p className="text-white/60 text-xs">
+                            {movie.release_date?.split("-")[0]}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Movie Player Modal */}
       {showPlayer && (
-        <MoviePlayer 
-          movieId={movieId} 
-          onClose={() => setShowPlayer(false)} 
+        <MoviePlayer
+          movieId={movieId}
+          onClose={() => setShowPlayer(false)}
         />
       )}
 
       {/* Create List Modal */}
-      <CreateListModal 
-        isOpen={showCreateModal} 
-        onClose={() => setShowCreateModal(false)} 
-        userId={user?.uid} 
+      <CreateListModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        userId={user?.uid}
       />
     </div>
   );

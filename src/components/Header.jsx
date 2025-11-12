@@ -3,14 +3,12 @@ import { signOut } from "firebase/auth";
 import { auth } from "../util/firebase";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { Search } from "lucide-react";
 
 const Header = () => {
   const navigate = useNavigate();
   const user = useSelector((store) => store.user.user);
-
-
   const [openMenu, setOpenMenu] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const menuRef = useRef(null);
 
   const handleSignOut = () => {
@@ -19,9 +17,14 @@ const Header = () => {
       .catch(() => navigate("/error"));
   };
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-
-  // Close dropdown on outside click or Esc
   useEffect(() => {
     const onClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -40,81 +43,88 @@ const Header = () => {
   }, []);
 
   return (
-    <header className="fixed top-0 left-0 w-full h-16 z-30 bg-gradient-to-b from-black via-black/80 to-transparent">
-      <div className="h-full px-6 flex items-center">
-        {/* Left: Logo (bigger) */}
+    <header 
+      className={`fixed top-0 left-0 w-full h-20 z-50 transition-all duration-300 ${
+        scrolled 
+          ? 'glass-effect shadow-2xl' 
+          : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
+      }`}
+    >
+      <div className="h-full px-6 lg:px-12 flex items-center max-w-[1600px] mx-auto">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center focus:outline-none"
+          className="flex items-center gap-3 focus:outline-none group"
           aria-label="Go to Home"
         >
-          <img
-            src="https://i.pinimg.com/736x/8b/51/4d/8b514d341909dca0c6bbb9d20d742dab.jpg"
-            alt="Logo"
-            className="h-10 md:h-11 w-auto"
-          />
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-4xl text-red-600 group-hover:scale-110 transition-transform">
+              local_movies
+            </span>
+            <span className="font-display text-3xl font-bold gradient-text hidden sm:block">
+              STRIVE
+            </span>
+          </div>
         </button>
 
-        {/* Spacer pushes nav and actions to the right */}
         <div className="flex-1" />
 
-        {/* Right: Navigation + actions (no notification) */}
         {user ? (
-          <div className="flex items-center space-x-6">
-            {/* Right-aligned navigation */}
-            <nav aria-label="Primary" className="text-white">
-              <ul className="flex items-center space-x-6 text-sm md:text-base font-semibold">
+          <div className="flex items-center gap-8">
+            <nav aria-label="Primary" className="hidden md:block">
+              <ul className="flex items-center gap-8 font-secondary">
                 <li>
                   <button
                     onClick={() => navigate("/")}
-                    className="hover:text-red-500 focus:outline-none"
+                    className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    Home
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">home</span>
+                    <span>Home</span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => navigate("/movies")}
-                    className="hover:text-red-500 focus:outline-none"
+                    className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    Movies
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">movie</span>
+                    <span>Movies</span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => navigate("/shows")}
-                    className="hover:text-red-500 focus:outline-none"
+                    className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    Shows
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">tv</span>
+                    <span>Shows</span>
                   </button>
                 </li>
                 <li>
                   <button
                     onClick={() => navigate("/my-lists")}
-                    className="hover:text-red-500 focus:outline-none"
+                    className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    My Lists
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">playlist_play</span>
+                    <span>My Lists</span>
                   </button>
                 </li>
               </ul>
             </nav>
 
-            {/* Search Icon */}
             <button
               onClick={() => navigate("/search")}
               aria-label="Search"
-              className="bg-gray-800 hover:bg-gray-700 text-white rounded-full p-2 focus:outline-none"
+              className="glass-effect hover:bg-white/20 text-white rounded-full p-3 transition-all duration-300 hover:scale-105"
             >
-              <Search className="w-5 h-5" />
+              <span className="material-symbols-outlined">search</span>
             </button>
 
-            {/* Account icon + Dropdown (black, neat, modern) */}
-            <div className="relative mr-4" ref={menuRef}>
+            <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setOpenMenu((s) => !s)}
                 aria-haspopup="menu"
                 aria-expanded={openMenu}
-                className="w-8 h-8 rounded-full bg-gray-700 text-white font-bold text-sm flex items-center justify-center hover:ring-2 hover:ring-red-600 focus:outline-none"
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-red-800 text-white font-bold text-sm flex items-center justify-center hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-red-600/50"
               >
                 {(user?.name?.[0] || user?.email?.[0] || "U").toUpperCase()}
               </button>
@@ -122,43 +132,49 @@ const Header = () => {
               {openMenu && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-3 w-56 rounded-lg bg-black/95 border border-white/10 shadow-xl overflow-hidden"
+                  className="absolute right-0 mt-4 w-64 rounded-2xl glass-effect shadow-2xl overflow-hidden border border-white/10 animate-fade-in"
                 >
+                  <div className="p-4 border-b border-white/10">
+                    <p className="text-white font-semibold font-secondary">{user?.name || "User"}</p>
+                    <p className="text-white/60 text-sm mt-1">{user?.email}</p>
+                  </div>
                   <button
                     role="menuitem"
                     onClick={() => {}}
-                    className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/10"
+                    className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/10 transition-colors flex items-center gap-3 font-secondary"
                   >
-                    Account
+                    <span className="material-symbols-outlined text-xl">account_circle</span>
+                    <span>Account</span>
                   </button>
                   <button
                     role="menuitem"
                     onClick={() => {}}
-                    className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/10"
+                    className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/10 transition-colors flex items-center gap-3 font-secondary"
                   >
-                    Settings
+                    <span className="material-symbols-outlined text-xl">settings</span>
+                    <span>Settings</span>
                   </button>
                   <div className="h-px bg-white/10" />
                   <button
                     role="menuitem"
                     onClick={handleSignOut}
-                    className="w-full text-left px-4 py-3 text-sm font-semibold text-red-400 hover:bg-white/10"
+                    className="w-full text-left px-4 py-3 text-sm font-semibold text-red-400 hover:bg-white/10 transition-colors flex items-center gap-3 font-secondary"
                   >
-                    Sign Out
+                    <span className="material-symbols-outlined text-xl">logout</span>
+                    <span>Sign Out</span>
                   </button>
                 </div>
               )}
             </div>
           </div>
         ) : (
-          <div className="flex items-center space-x-6">
-            {/* Simplified navigation for non-authenticated users */}
-            <nav aria-label="Primary" className="text-white">
-              <ul className="flex items-center space-x-6 text-sm md:text-base font-semibold">
+          <div className="flex items-center gap-6">
+            <nav aria-label="Primary" className="hidden md:block">
+              <ul className="flex items-center gap-8 font-secondary">
                 <li>
                   <button
                     onClick={() => navigate("/")}
-                    className="hover:text-red-500 focus:outline-none"
+                    className="text-white/90 hover:text-white font-medium text-base transition-colors"
                   >
                     Home
                   </button>
@@ -166,7 +182,7 @@ const Header = () => {
                 <li>
                   <button
                     onClick={() => navigate("/movies")}
-                    className="hover:text-red-500 focus:outline-none"
+                    className="text-white/90 hover:text-white font-medium text-base transition-colors"
                   >
                     Movies
                   </button>
@@ -174,30 +190,28 @@ const Header = () => {
                 <li>
                   <button
                     onClick={() => navigate("/shows")}
-                    className="hover:text-red-500 focus:outline-none"
+                    className="text-white/90 hover:text-white font-medium text-base transition-colors"
                   >
                     Shows
                   </button>
                 </li>
-                {/* "My Lists" button is hidden when user is not logged in */}
               </ul>
             </nav>
 
-            {/* Search Icon for non-authenticated users */}
             <button
               onClick={() => navigate("/search")}
               aria-label="Search"
-              className="bg-gray-800 hover:bg-gray-700 text-white rounded-full p-2 focus:outline-none"
+              className="glass-effect hover:bg-white/20 text-white rounded-full p-3 transition-all duration-300"
             >
-              <Search className="w-5 h-5" />
+              <span className="material-symbols-outlined">search</span>
             </button>
 
-            {/* Login button for non-authenticated users */}
             <button
               onClick={() => navigate("/login")}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold"
+              className="btn-primary flex items-center gap-2"
             >
-              Login
+              <span className="material-symbols-outlined text-xl">login</span>
+              <span>Sign In</span>
             </button>
           </div>
         )}

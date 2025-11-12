@@ -5,27 +5,24 @@
 
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
+import IMDbService from './imdbService';
+import { getImdbId } from './imdbResolver';
 
-// Helper to fetch TMDB external IDs (IMDb ID)
-async function fetchTmdbExternalIds(mediaType, tmdbId) {
-  const tmdbKey = import.meta.env.VITE_TMDB_KEY;
-  if (!tmdbKey || !tmdbId) return null;
+// Helper to fetch IMDb rating and votes
+async function fetchImdbRatingData(imdbId) {
+  if (!imdbId) return { rating: '', votes: '' };
   
   try {
-    const url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/external_ids`;
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${tmdbKey}`,
-        'accept': 'application/json'
-      }
-    });
+    const imdbService = new IMDbService();
+    const titleData = await imdbService.getTitleById(imdbId);
     
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.imdb_id || '';
+    return {
+      rating: titleData?.rating?.aggregateRating || '',
+      votes: titleData?.rating?.voteCount || ''
+    };
   } catch (error) {
-    console.warn(`Failed to fetch IMDb ID for ${mediaType} ${tmdbId}:`, error.message);
-    return '';
+    console.warn(`Failed to fetch IMDb rating for ${imdbId}:`, error.message);
+    return { rating: '', votes: '' };
   }
 }
 
@@ -85,7 +82,7 @@ export async function exportListClientSide(listId, listName, userId) {
       items.push(doc.data());
     });
     
-    // Fetch IMDb IDs concurrently with rate limiting
+    // Fetch IMDb IDs and ratings concurrently with rate limiting
     const limit = pLimit(5); // Limit to 5 concurrent requests
     const enrichedItems = await Promise.all(
       items.map(item => limit(async () => {
@@ -99,7 +96,14 @@ export async function exportListClientSide(listId, listName, userId) {
         
         // If no IMDb ID is stored, try to fetch it
         if (!imdbId && tmdbId) {
-          imdbId = await fetchTmdbExternalIds(mediaType, tmdbId);
+          imdbId = await getImdbId(tmdbId, mediaType);
+        }
+        
+        // If we have IMDb ID but no rating, fetch it
+        if (imdbId && !imdbRating) {
+          const ratingData = await fetchImdbRatingData(imdbId);
+          imdbRating = ratingData.rating;
+          imdbVotes = ratingData.votes;
         }
         
         return {
