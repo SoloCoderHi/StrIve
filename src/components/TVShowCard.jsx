@@ -1,24 +1,15 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { IMG_CDN_URL } from "../util/constants";
-import useImdbTitle from "../hooks/useImdbTitle";
 
 const TVShowCard = ({ tvShow }) => {
   const navigate = useNavigate();
-  const { data: imdbData, loading: imdbLoading } = useImdbTitle(tvShow.id, "tv");
 
   if (!tvShow.poster_path) return null;
 
   const handleClick = () => {
     navigate(`/shows/${tvShow.id}`);
   };
-  
-  // Determine which rating to display
-  const displayRating = (!imdbLoading && imdbData?.rating?.aggregateRating) 
-    ? imdbData.rating.aggregateRating 
-    : tvShow.vote_average?.toFixed(1);
-  
-  const ratingSource = (!imdbLoading && imdbData?.rating?.aggregateRating) ? "IMDb" : "TMDB";
 
   return (
     <div
@@ -48,10 +39,7 @@ const TVShowCard = ({ tvShow }) => {
                   star
                 </span>
                 <span className="text-white font-semibold text-sm font-secondary">
-                  {displayRating}
-                </span>
-                <span className="text-white/60 text-xs font-secondary">
-                  {ratingSource}
+                  {tvShow.vote_average?.toFixed(1)}
                 </span>
               </div>
               <div className="glass-effect px-3 py-1.5 rounded-full flex items-center gap-1">
@@ -72,10 +60,7 @@ const TVShowCard = ({ tvShow }) => {
               star
             </span>
             <span className="text-white font-semibold text-sm font-secondary">
-              {displayRating}
-            </span>
-            <span className="text-white/60 text-xs font-secondary">
-              {ratingSource}
+              {tvShow.vote_average?.toFixed(1)}
             </span>
           </div>
         </div>
