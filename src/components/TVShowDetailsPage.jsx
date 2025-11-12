@@ -7,6 +7,7 @@ import useTvShowDetails from "../hooks/useTvShowDetails";
 import useTvSeasonEpisodes from "../hooks/useTvSeasonEpisodes";
 import useTvVideos from "../hooks/useTvVideos";
 import useRequireAuth from "../hooks/useRequireAuth";
+import useImdbTitle from "../hooks/useImdbTitle";
 import { addToList } from "../util/firestoreService";
 import { options } from "../util/constants";
 import EpisodeOverlay from "./EpisodeOverlay";
@@ -27,6 +28,7 @@ const TVShowDetailsPage = () => {
 
   const { data: showDetails, loading: detailsLoading, error: detailsError } = useTvShowDetails(tvId);
   const { data: videos } = useTvVideos(tvId);
+  const { data: imdbData, loading: imdbLoading, error: imdbError } = useImdbTitle(tvId, "tv");
 
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
@@ -246,6 +248,55 @@ const TVShowDetailsPage = () => {
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* RATINGS SECTION */}
+                <div className="mb-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* TMDB Rating */}
+                    <div className="rounded-lg p-3 border" style={{ 
+                      backgroundColor: 'rgba(255,255,255,0.05)', 
+                      borderColor: 'rgba(255,255,255,0.1)' 
+                    }}>
+                      <div className="text-xs uppercase mb-1" style={{ color: '#888' }}>TMDB</div>
+                      <div className="flex items-center gap-2">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xl font-bold" style={{ color: '#fff' }}>
+                          {showDetails.voteAverage?.toFixed(1) || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="text-xs mt-1" style={{ color: '#888' }}>
+                        {showDetails.voteCount ? `${(showDetails.voteCount / 1000).toFixed(1)}k votes` : 'No votes'}
+                      </div>
+                    </div>
+
+                    {/* IMDb Rating */}
+                    <div className="rounded-lg p-3 border" style={{ 
+                      backgroundColor: 'rgba(255,255,255,0.05)', 
+                      borderColor: 'rgba(255,255,255,0.1)' 
+                    }}>
+                      <div className="text-xs uppercase mb-1" style={{ color: '#888' }}>IMDb</div>
+                      {imdbLoading ? (
+                        <div className="h-8 flex items-center">
+                          <div className="h-5 w-12 rounded animate-pulse" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}></div>
+                        </div>
+                      ) : imdbData?.rating?.aggregateRating ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">⭐</span>
+                            <span className="text-xl font-bold" style={{ color: '#fff' }}>
+                              {imdbData.rating.aggregateRating}
+                            </span>
+                          </div>
+                          <div className="text-xs mt-1" style={{ color: '#888' }}>
+                            {imdbData.rating.voteCount ? `${(imdbData.rating.voteCount / 1000).toFixed(1)}k votes` : 'No votes'}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm" style={{ color: '#888' }}>Not available</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Overview */}
