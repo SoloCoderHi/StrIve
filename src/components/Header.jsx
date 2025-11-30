@@ -43,14 +43,14 @@ const Header = () => {
   }, []);
 
   return (
-    <header 
-      className={`fixed top-0 left-0 w-full h-20 z-50 transition-all duration-300 ${
-        scrolled 
-          ? 'glass-effect shadow-2xl' 
-          : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
+    <header
+      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
+        scrolled
+          ? "h-14 glass-effect shadow-lg backdrop-blur-md"
+          : "h-16 bg-black border-b border-gray-900"
       }`}
     >
-      <div className="h-full px-6 lg:px-12 flex items-center max-w-[1600px] mx-auto">
+      <div className="h-full max-w-full px-10 flex items-center mx-auto">
         <button
           onClick={() => navigate("/")}
           className="flex items-center gap-3 focus:outline-none group"
@@ -77,7 +77,9 @@ const Header = () => {
                     onClick={() => navigate("/")}
                     className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">home</span>
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">
+                      home
+                    </span>
                     <span>Home</span>
                   </button>
                 </li>
@@ -86,7 +88,9 @@ const Header = () => {
                     onClick={() => navigate("/movies")}
                     className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">movie</span>
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">
+                      movie
+                    </span>
                     <span>Movies</span>
                   </button>
                 </li>
@@ -95,7 +99,9 @@ const Header = () => {
                     onClick={() => navigate("/shows")}
                     className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">tv</span>
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">
+                      tv
+                    </span>
                     <span>Shows</span>
                   </button>
                 </li>
@@ -104,7 +110,9 @@ const Header = () => {
                     onClick={() => navigate("/my-lists")}
                     className="text-white/90 hover:text-white font-medium text-base transition-colors flex items-center gap-2 group"
                   >
-                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">playlist_play</span>
+                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">
+                      playlist_play
+                    </span>
                     <span>My Lists</span>
                   </button>
                 </li>
@@ -114,9 +122,9 @@ const Header = () => {
             <button
               onClick={() => navigate("/search")}
               aria-label="Search"
-              className="glass-effect hover:bg-white/20 text-white rounded-full p-3 transition-all duration-300 hover:scale-105"
+              className="text-white hover:text-red-600 transition-colors duration-300 p-2"
             >
-              <span className="material-symbols-outlined">search</span>
+              <span className="material-symbols-outlined text-2xl">search</span>
             </button>
 
             <div className="relative" ref={menuRef}>
@@ -135,7 +143,9 @@ const Header = () => {
                   className="absolute right-0 mt-4 w-64 rounded-2xl glass-effect shadow-2xl overflow-hidden border border-white/10 animate-fade-in"
                 >
                   <div className="p-4 border-b border-white/10">
-                    <p className="text-white font-semibold font-secondary">{user?.name || "User"}</p>
+                    <p className="text-white font-semibold font-secondary">
+                      {user?.name || "User"}
+                    </p>
                     <p className="text-white/60 text-sm mt-1">{user?.email}</p>
                   </div>
                   <button
@@ -143,7 +153,9 @@ const Header = () => {
                     onClick={() => {}}
                     className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/10 transition-colors flex items-center gap-3 font-secondary"
                   >
-                    <span className="material-symbols-outlined text-xl">account_circle</span>
+                    <span className="material-symbols-outlined text-xl">
+                      account_circle
+                    </span>
                     <span>Account</span>
                   </button>
                   <button
@@ -151,8 +163,22 @@ const Header = () => {
                     onClick={() => {}}
                     className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/10 transition-colors flex items-center gap-3 font-secondary"
                   >
-                    <span className="material-symbols-outlined text-xl">settings</span>
+                    <span className="material-symbols-outlined text-xl">
+                      settings
+                    </span>
                     <span>Settings</span>
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => navigate("/simkl")}
+                    className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/10 transition-colors flex items-center gap-3 font-secondary"
+                  >
+                    <img
+                      src="https://simkl.com/favicon.ico"
+                      alt=""
+                      className="w-5 h-5 opacity-80"
+                    />
+                    <span>Simkl Sync</span>
                   </button>
                   <div className="h-px bg-white/10" />
                   <button
@@ -160,7 +186,9 @@ const Header = () => {
                     onClick={handleSignOut}
                     className="w-full text-left px-4 py-3 text-sm font-semibold text-red-400 hover:bg-white/10 transition-colors flex items-center gap-3 font-secondary"
                   >
-                    <span className="material-symbols-outlined text-xl">logout</span>
+                    <span className="material-symbols-outlined text-xl">
+                      logout
+                    </span>
                     <span>Sign Out</span>
                   </button>
                 </div>

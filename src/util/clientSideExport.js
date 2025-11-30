@@ -82,6 +82,10 @@ export async function exportListClientSide(listId, listName, userId) {
       items.push(doc.data());
     });
     
+    console.log('📊 CSV Export Debug - Sample item:', items[0]);
+    console.log('   vote_count field:', items[0]?.vote_count);
+    console.log('   vote_average field:', items[0]?.vote_average);
+    
     // Fetch IMDb IDs and ratings concurrently with rate limiting
     const limit = pLimit(5); // Limit to 5 concurrent requests
     const enrichedItems = await Promise.all(

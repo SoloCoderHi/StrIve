@@ -1,21 +1,24 @@
-import React, { useEffect, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { useParams, useLocation } from 'react-router-dom';
-import useRequireAuth from '../hooks/useRequireAuth';
-import { fetchActiveList, removeItem } from '../util/listsSlice';
-import MovieCard from './MovieCard';
-import FilterControls from './FilterControls';
-import Header from './Header';
-import Footer from './Footer';
-import { exportListCsv } from '../util/exportDownload';
+import React, { useEffect, useCallback, useState, useMemo } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useParams, useLocation } from "react-router-dom";
+import useRequireAuth from "../hooks/useRequireAuth";
+import { fetchActiveList, removeItem } from "../util/listsSlice";
+import MovieCard from "./MovieCard";
+import Header from "./Header";
+import { exportListCsv } from "../util/exportDownload";
 
 const ListDetailsPage = () => {
   const dispatch = useDispatch();
   const user = useRequireAuth();
   const { listId } = useParams();
   const location = useLocation();
-  const { details, items, status, error } = useSelector((state) => state.lists.activeList);
-  const [successMessage, setSuccessMessage] = React.useState(null);
+  const { details, items, status, error } = useSelector(
+    (state) => state.lists.activeList
+  );
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [filterType, setFilterType] = useState("all");
+  const [sortType, setSortType] = useState("dateAddedDesc");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (user && listId) {
@@ -26,7 +29,8 @@ const ListDetailsPage = () => {
   useEffect(() => {
     if (location.state?.importSuccess) {
       const count = location.state.importSuccess;
-      const msg = location.state.message || `${count} items successfully imported`;
+      const msg =
+        location.state.message || `${count} items successfully imported`;
       setSuccessMessage(msg);
       const timer = setTimeout(() => setSuccessMessage(null), 5000);
       return () => clearTimeout(timer);
@@ -36,14 +40,16 @@ const ListDetailsPage = () => {
   const handleRemoveItem = async (item) => {
     if (user && listId) {
       try {
-        await dispatch(removeItem({ userId: user.uid, listId, mediaId: item.id })).unwrap();
+        await dispatch(
+          removeItem({ userId: user.uid, listId, mediaId: item.id })
+        ).unwrap();
       } catch (err) {
-        console.error('Failed to remove item:', err);
+        console.error("Failed to remove item:", err);
       }
     }
   };
 
-  const [exporting, setExporting] = React.useState(false);
+  const [exporting, setExporting] = useState(false);
   const handleExport = useCallback(async () => {
     if (!user || !listId) return;
     try {
@@ -54,61 +60,218 @@ const ListDetailsPage = () => {
     }
   }, [user, listId, details]);
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-grow container mx-auto px-4 py-8 pt-16">
-        {status === 'loading' && <div className="text-center">Loading list details...</div>}
-        
-        {error && <div className="text-center text-red-500">Error: {error}</div>}
+  const filteredAndSortedItems = useMemo(() => {
+    if (!items) return [];
 
-        {successMessage && (
-          <div className="mb-6 p-4 bg-green-900/50 border border-green-700 rounded-lg text-green-300 text-center">
-            {successMessage}
+    let filtered = [...items];
+
+    // Search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter((item) => {
+        const title = (item.title || item.name || "").toLowerCase();
+        return title.includes(searchQuery.toLowerCase());
+      });
+    }
+
+    // Type filter
+    if (filterType !== "all") {
+      filtered = filtered.filter((item) => {
+        const itemType =
+          item.media_type || (item.first_air_date ? "tv" : "movie");
+        return itemType === filterType;
+      });
+    }
+
+    // Sorting
+    if (sortType === "dateAddedDesc") {
+      filtered.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+    } else if (sortType === "titleAsc") {
+      filtered.sort((a, b) =>
+        (a.title || a.name).localeCompare(b.title || b.name)
+      );
+    } else if (sortType === "voteAverageDesc") {
+      filtered.sort((a, b) => b.vote_average - a.vote_average);
+    }
+
+    return filtered;
+  }, [items, filterType, sortType, searchQuery]);
+
+  return (
+    <div className="min-h-screen bg-black flex flex-col">
+      <Header />
+
+      {status === "loading" && (
+        <div className="flex-grow flex items-center justify-center pt-32">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-800 border-t-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading list details...</p>
           </div>
-        )}
-        
-        {status !== 'loading' && !error && details && (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold">{details.name}</h1>
-              <button
-                onClick={handleExport}
-                disabled={exporting}
-                aria-busy={exporting}
-                className={`px-4 py-2 ${exporting ? 'bg-green-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white rounded-lg text-sm font-semibold flex items-center gap-2`}
+        </div>
+      )}
+
+      {error && (
+        <div className="flex-grow flex items-center justify-center pt-32">
+          <div className="bg-gray-900 rounded-lg p-8 text-center border border-gray-800">
+            <span className="material-symbols-outlined text-6xl text-red-400 mb-4">
+              error
+            </span>
+            <p className="text-red-400">Error: {error}</p>
+          </div>
+        </div>
+      )}
+
+      {status !== "loading" && !error && details && (
+        <>
+          {/* Top Space for Additional Fields */}
+          <div className="w-full bg-black pt-20">
+            <div className="max-w-full mx-auto px-10 py-6">
+              <div
+                className="flex items-center justify-between"
+                style={{ minHeight: "150px" }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-download">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Export as CSV
-              </button>
-            </div>
-            
-            {items && items.length > 0 ? (
-              <FilterControls items={items}>
-                {(filteredAndSortedItems) => (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {filteredAndSortedItems.map((item) => (
-                      <MovieCard
-                        key={item.id}
-                        movie={item}
-                        onRemove={() => handleRemoveItem(item)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </FilterControls>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600">This list is empty. Add some titles to get started!</p>
+                {/* Reserved space for future fields */}
+                <div className="flex-1">
+                  {/* Additional fields will go here */}
+                </div>
+                {/* List Title - Top Right */}
+                <div className="text-right">
+                  <h1 className="text-4xl font-bold text-white">
+                    {details.name}
+                  </h1>
+                  {details.description && (
+                    <p className="text-gray-400 mt-2">{details.description}</p>
+                  )}
+                  <p className="text-gray-500 text-sm mt-1">
+                    {items?.length || 0} items
+                  </p>
+                </div>
               </div>
-            )}
+            </div>
           </div>
-        )}
-      </main>
+
+          {/* Control Header */}
+          <div className="w-full bg-black/95 backdrop-blur-sm border-b border-gray-900 sticky top-16 z-40">
+            <div className="max-w-full mx-auto px-10 py-3">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                {/* Left: Search */}
+                <div className="flex-1 w-full lg:w-auto">
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Filter this list..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full lg:w-96 pl-10 pr-4 py-2 bg-transparent rounded-full text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-white/20 border border-gray-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Right: Filters and Actions */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Filter Chips */}
+                  <button
+                    onClick={() => setFilterType("all")}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      filterType === "all"
+                        ? "bg-white text-black"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setFilterType("movie")}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      filterType === "movie"
+                        ? "bg-white text-black"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  >
+                    Movies
+                  </button>
+                  <button
+                    onClick={() => setFilterType("tv")}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      filterType === "tv"
+                        ? "bg-white text-black"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  >
+                    TV Shows
+                  </button>
+
+                  {/* Sort Dropdown */}
+                  <select
+                    value={sortType}
+                    onChange={(e) => setSortType(e.target.value)}
+                    className="px-4 py-2 bg-gray-900 border border-gray-900 rounded-full text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer"
+                  >
+                    <option value="dateAddedDesc">Sort: Date Added</option>
+                    <option value="titleAsc">Sort: Title (A-Z)</option>
+                    <option value="voteAverageDesc">Sort: Rating</option>
+                  </select>
+
+                  {/* Export Button */}
+                  <button
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className={`px-4 py-2 bg-gray-900 border border-gray-900 rounded-full text-sm flex items-center gap-2 transition-all ${
+                      exporting
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-gray-800"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      download
+                    </span>
+                    <span className="text-white">Export</span>
+                  </button>
+                </div>
+              </div>
+
+              {successMessage && (
+                <div className="mt-3 p-2.5 bg-green-900/30 border border-green-700 rounded-lg text-green-400 text-center text-sm">
+                  {successMessage}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Main Content Grid */}
+          <main className="flex-grow w-full bg-black pb-20">
+            <div className="max-w-full mx-auto px-10 py-8">
+              {filteredAndSortedItems.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2">
+                  {filteredAndSortedItems.map((item, index) => (
+                    <MovieCard
+                      key={`${item.id}-${index}`}
+                      movie={item}
+                      onRemove={() => handleRemoveItem(item)}
+                      vaultMode={true}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-gray-900 rounded-lg p-16 text-center border border-gray-800 mt-20">
+                  <span className="material-symbols-outlined text-7xl text-gray-700 mb-4">
+                    {searchQuery || filterType !== "all"
+                      ? "search_off"
+                      : "movie_off"}
+                  </span>
+                  <p className="text-gray-400 text-lg">
+                    {searchQuery || filterType !== "all"
+                      ? "No items match your filters"
+                      : "This collection is empty. Go browse to add items."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </main>
+        </>
+      )}
     </div>
   );
 };

@@ -37,10 +37,10 @@ const MoviesPage = () => {
   };
 
   return (
-    <div className="min-h-screen premium-page">
+    <div className="min-h-screen premium-page pt-20">
       <Header />
       
-      <div className="pt-24 pb-12 px-6 lg:px-12">
+      <div className="pt-4 pb-12 px-6 lg:px-12">
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex justify-center mb-6">
             <div className="glass-effect p-6 rounded-full">

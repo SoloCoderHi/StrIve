@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Prevent white overscroll background */
+html {
+  background-color: #000000;
+  overscroll-behavior: none;
+}
+
+body {
+  background-color: #000000;
+  overscroll-behavior: none;
+}
+
 /* Premium Design Tokens */
 :root {
   /* Colors - AMOLED Pure Black Theme */

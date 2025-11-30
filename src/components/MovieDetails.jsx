@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { options } from "../util/constants";
-import { addToList } from "../util/firestoreService";
-import { addItem } from "../util/listsSlice";
-import { useDispatch } from "react-redux";
+import { addItem, fetchLists } from "../util/listsSlice";
 import Header from "./Header";
 import useRequireAuth from "../hooks/useRequireAuth";
 import useImdbTitle from "../hooks/useImdbTitle";
@@ -25,9 +24,13 @@ const MovieDetails = () => {
   const [showPlayer, setShowPlayer] = useState(false);
   const [showPopover, setShowPopover] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [hoverTimeout, setHoverTimeout] = useState(null);
   const navigate = useNavigate();
   const user = useRequireAuth();
   const dispatch = useDispatch();
+  
+  // Get lists from Redux
+  const { customLists } = useSelector((state) => state.lists);
   
   const currentId = imdbId || movieId;
   const mediaType = currentId && currentId.startsWith('tt') ? "movie" : "movie";
@@ -53,6 +56,20 @@ const MovieDetails = () => {
     fetchMovieDetails();
   }, [fetchMovieDetails]);
 
+  // Fetch user's lists on mount
+  useEffect(() => {
+    if (user) {
+      dispatch(fetchLists(user.uid));
+    }
+  }, [dispatch, user]);
+  
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+    };
+  }, [hoverTimeout]);
+
   const handlePlayMovie = () => {
     if (!user) {
       alert("Please log in to watch movies.");
@@ -62,32 +79,7 @@ const MovieDetails = () => {
     setShowPlayer(true);
   };
 
-  const handleAddToWatchlist = async () => {
-    if (!user) {
-      alert("Please log in to add movies to your watchlist.");
-      return;
-    }
-
-    try {
-      const mediaItem = {
-        id: movieDetails.id,
-        title: movieDetails.title,
-        poster_path: movieDetails.poster_path,
-        overview: movieDetails.overview,
-        release_date: movieDetails.release_date,
-        vote_average: movieDetails.vote_average,
-        type: "movie",
-      };
-
-      await addToList(user.uid, "watchlist", mediaItem);
-      alert(`${mediaItem.title} added to your watchlist!`);
-    } catch (error) {
-      console.error("Error adding to watchlist:", error);
-      alert("Failed to add to watchlist. Please try again.");
-    }
-  };
-
-  const handleSelectList = async (listId, listType) => {
+  const handleSelectList = async (listId) => {
     if (!user) {
       alert("Please log in to add movies to your lists.");
       setShowPopover(false);
@@ -102,20 +94,16 @@ const MovieDetails = () => {
         overview: movieDetails.overview,
         release_date: movieDetails.release_date,
         vote_average: movieDetails.vote_average,
-        type: "movie",
+        vote_count: movieDetails.vote_count,
+        media_type: "movie",
       };
 
-      if (listType === 'watchlist') {
-        await addToList(user.uid, "watchlist", mediaItem);
-        alert(`${mediaItem.title} added to your watchlist!`);
-      } else {
-        await dispatch(addItem({ 
-          userId: user.uid, 
-          listId, 
-          mediaItem 
-        })).unwrap();
-        alert(`${mediaItem.title} added to your list!`);
-      }
+      await dispatch(addItem({ 
+        userId: user.uid, 
+        listId, 
+        mediaItem 
+      })).unwrap();
+      alert(`${mediaItem.title} added to your list!`);
       
       setShowPopover(false);
     } catch (error) {
@@ -132,7 +120,8 @@ const MovieDetails = () => {
   if (loading) {
     return (
       <div className="min-h-screen premium-page flex items-center justify-center">
-        <div className="text-center">
+        <Header />
+        <div className="text-center mt-20">
           <div className="animate-spin rounded-full h-20 w-20 border-4 border-white/20 border-t-red-600 mx-auto"></div>
           <div className="mt-6 text-white text-lg font-secondary">Loading Movie Details...</div>
         </div>
@@ -143,7 +132,8 @@ const MovieDetails = () => {
   if (!movieDetails) {
     return (
       <div className="min-h-screen premium-page flex items-center justify-center">
-        <div className="text-center">
+        <Header />
+        <div className="text-center mt-20">
           <span className="material-symbols-outlined text-8xl text-white/30 mb-4">
             movie_off
           </span>
@@ -161,7 +151,7 @@ const MovieDetails = () => {
   }
 
   return (
-    <div className="min-h-screen premium-page">
+    <div className="min-h-screen premium-page pt-20">
       <Header />
       
       {/* Hero Section with Backdrop */}
@@ -276,22 +266,39 @@ const MovieDetails = () => {
                   <span>Play Now</span>
                 </button>
 
-                <div className="relative">
+                <div 
+                  className="relative"
+                  onMouseEnter={() => {
+                    if (hoverTimeout) clearTimeout(hoverTimeout);
+                    const timeout = setTimeout(() => setShowPopover(true), 500);
+                    setHoverTimeout(timeout);
+                  }}
+                  onMouseLeave={() => {
+                    if (hoverTimeout) clearTimeout(hoverTimeout);
+                    const timeout = setTimeout(() => setShowPopover(false), 300);
+                    setHoverTimeout(timeout);
+                  }}
+                >
                   <button
-                    onClick={handleAddToWatchlist}
-                    onMouseEnter={() => setShowPopover(true)}
                     className="btn-secondary text-lg px-8 py-4 flex items-center gap-3"
                   >
                     <span className="material-symbols-outlined text-2xl">add</span>
-                    <span>My List</span>
+                    <span>Add to List</span>
                   </button>
 
                   {showPopover && (
                     <div
-                      onMouseEnter={() => setShowPopover(true)}
-                      onMouseLeave={() => setShowPopover(false)}
+                      onMouseEnter={() => {
+                        if (hoverTimeout) clearTimeout(hoverTimeout);
+                      }}
+                      onMouseLeave={() => {
+                        if (hoverTimeout) clearTimeout(hoverTimeout);
+                        const timeout = setTimeout(() => setShowPopover(false), 300);
+                        setHoverTimeout(timeout);
+                      }}
                     >
                       <AddToListPopover
+                        isOpen={showPopover}
                         onSelectList={handleSelectList}
                         onCreateNew={handleCreateNew}
                       />

@@ -5,6 +5,9 @@ import { auth } from "./util/firebase";
 import { login, logout } from "./util/userSlice";
 import Body from "./components/Body";
 
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 const App = () => {
   const dispatch = useDispatch();
 
@@ -26,9 +29,9 @@ const App = () => {
   }, [dispatch]);
 
   return (
-    
     <div>
       <Body />
+      <ToastContainer position="bottom-right" theme="dark" />
     </div>
   );
 };

@@ -1,64 +1,19 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { 
-  getList, 
-  removeFromList, 
-  createCustomList, 
-  deleteCustomList, 
-  addItemToCustomList, 
-  removeItemFromCustomList, 
+import {
+  getList,
+  addToList,
+  removeFromList,
+  createCustomList,
+  deleteCustomList,
+  addItemToCustomList,
+  removeItemFromCustomList,
   fetchListWithItems,
-  fetchUserListsWithPreviews
+  fetchUserListsWithPreviews,
+  pinList as pinListService,
+  unpinList as unpinListService,
+  createDefaultWatchLaterList,
+  addItemsToCustomListBatch,
 } from "./firestoreService";
-
-// Async thunks for watchlist (existing functionality)
-export const fetchWatchlist = createAsyncThunk(
-  "lists/fetchWatchlist",
-  async (userId, { rejectWithValue }) => {
-    try {
-      const watchlist = await getList(userId, "watchlist");
-      // Return the watchlist with limited items for preview (first 10)
-      
-      // Convert Firestore Timestamps to serializable format before returning
-      const processedWatchlist = (watchlist.slice(0, 10) || []).map(item => {
-        // Create a copy of the item to avoid mutating the original
-        const processedItem = { ...item };
-        
-        // Convert dateAdded Timestamp to ISO string if it exists
-        if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
-          processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
-        }
-        
-        // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
-        if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
-          processedItem.release_date = processedItem.release_date.toDate().toISOString();
-        }
-        
-        // Convert any other Timestamp fields if they exist
-        if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
-          processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
-        }
-        
-        return processedItem;
-      });
-      
-      return processedWatchlist;
-    } catch (error) {
-      return rejectWithValue(error.toString());
-    }
-  }
-);
-
-export const removeItemFromWatchlist = createAsyncThunk(
-  "lists/removeItemFromWatchlist",
-  async ({ userId, mediaId }, { rejectWithValue }) => {
-    try {
-      await removeFromList(userId, "watchlist", mediaId);
-      return mediaId; // Return the ID of the removed item
-    } catch (error) {
-      return rejectWithValue(error.toString());
-    }
-  }
-);
 
 // Async thunks for custom lists
 export const fetchLists = createAsyncThunk(
@@ -66,44 +21,142 @@ export const fetchLists = createAsyncThunk(
   async (userId, { rejectWithValue }) => {
     try {
       const lists = await fetchUserListsWithPreviews(userId);
-      
+
       // Convert Firestore Timestamps to serializable format before returning
-      return lists.map(list => {
+      const processedLists = lists.map((list) => {
         // Process the list details
         const processedList = { ...list };
-        
+
         // If the list has a createdAt Timestamp, convert it to ISO string
-        if (processedList.createdAt && typeof processedList.createdAt.toDate === 'function') {
-          processedList.createdAt = processedList.createdAt.toDate().toISOString();
+        if (
+          processedList.createdAt &&
+          typeof processedList.createdAt.toDate === "function"
+        ) {
+          processedList.createdAt = processedList.createdAt
+            .toDate()
+            .toISOString();
         }
-        
+
         // Process items in the list if they exist
         if (processedList.items && Array.isArray(processedList.items)) {
-          processedList.items = processedList.items.map(item => {
+          processedList.items = processedList.items.map((item) => {
             // Create a copy of the item to avoid mutating the original
             const processedItem = { ...item };
-            
+
             // Convert dateAdded Timestamp to ISO string if it exists
-            if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
-              processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+            if (
+              processedItem.dateAdded &&
+              typeof processedItem.dateAdded.toDate === "function"
+            ) {
+              processedItem.dateAdded = processedItem.dateAdded
+                .toDate()
+                .toISOString();
             }
-            
+
             // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
-            if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
-              processedItem.release_date = processedItem.release_date.toDate().toISOString();
+            if (
+              processedItem.release_date &&
+              typeof processedItem.release_date.toDate === "function"
+            ) {
+              processedItem.release_date = processedItem.release_date
+                .toDate()
+                .toISOString();
             }
-            
+
             // Convert any other Timestamp fields if they exist
-            if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
-              processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+            if (
+              processedItem.createdAt &&
+              typeof processedItem.createdAt.toDate === "function"
+            ) {
+              processedItem.createdAt = processedItem.createdAt
+                .toDate()
+                .toISOString();
             }
-            
+
             return processedItem;
           });
         }
-        
+
         return processedList;
       });
+
+      // Sort: Pinned lists first, then by creation date
+      const sortedLists = processedLists.sort((a, b) => {
+        // If one is pinned and the other isn't, pinned comes first
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+
+        // If both are pinned, sort by pinnedAt (most recent first)
+        if (a.isPinned && b.isPinned) {
+          const dateA = new Date(a.pinnedAt || 0);
+          const dateB = new Date(b.pinnedAt || 0);
+          return dateB - dateA;
+        }
+
+        // If neither is pinned, sort by createdAt
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB - dateA;
+      });
+
+      return sortedLists;
+    } catch (error) {
+      return rejectWithValue(error.toString());
+    }
+  }
+);
+
+export const pinListThunk = createAsyncThunk(
+  "lists/pinList",
+  async ({ userId, listId }, { getState, rejectWithValue }) => {
+    try {
+      const state = getState();
+      const pinnedCount =
+        state.lists.customLists.lists?.filter((list) => list.isPinned).length ||
+        0;
+
+      // Check if pin limit reached (max 5)
+      if (pinnedCount >= 5) {
+        throw new Error(
+          "Maximum of 5 pinned lists reached. Please unpin a list first."
+        );
+      }
+
+      await pinListService(userId, listId);
+      return { listId, pinnedAt: new Date().toISOString() };
+    } catch (error) {
+      return rejectWithValue(error.message || error.toString());
+    }
+  }
+);
+
+export const unpinListThunk = createAsyncThunk(
+  "lists/unpinList",
+  async ({ userId, listId }, { rejectWithValue }) => {
+    try {
+      await unpinListService(userId, listId);
+      return listId;
+    } catch (error) {
+      return rejectWithValue(error.toString());
+    }
+  }
+);
+
+export const createDefaultList = createAsyncThunk(
+  "lists/createDefaultList",
+  async (userId, { rejectWithValue }) => {
+    try {
+      const newListId = await createDefaultWatchLaterList(userId);
+      return {
+        id: newListId,
+        name: "Watch Later",
+        description: "Your default watch later list",
+        ownerId: userId,
+        createdAt: new Date().toISOString(),
+        isPinned: true,
+        pinnedAt: new Date().toISOString(),
+        items: [],
+      };
     } catch (error) {
       return rejectWithValue(error.toString());
     }
@@ -115,8 +168,16 @@ export const createList = createAsyncThunk(
   async ({ userId, listData }, { rejectWithValue }) => {
     try {
       const newListId = await createCustomList(userId, listData);
+      const now = new Date();
       // Return both the new list ID and the original listData to construct the full list object
-      return { id: newListId, ...listData, ownerId: userId, createdAt: new Date() };
+      return {
+        id: newListId,
+        ...listData,
+        ownerId: userId,
+        createdAt: now,
+        // Set pinnedAt if the list is pinned
+        ...(listData.isPinned && { pinnedAt: now }),
+      };
     } catch (error) {
       return rejectWithValue(error.toString());
     }
@@ -159,42 +220,78 @@ export const removeItem = createAsyncThunk(
   }
 );
 
+export const addItemsBatch = createAsyncThunk(
+  "lists/addItemsBatch",
+  async ({ userId, listId, items }, { rejectWithValue }) => {
+    try {
+      await addItemsToCustomListBatch(userId, listId, items);
+      // Return the items with dateAdded for Redux state update
+      const itemsWithDate = items.map((item) => ({
+        ...item,
+        dateAdded: new Date().toISOString(),
+      }));
+      return { listId, items: itemsWithDate };
+    } catch (error) {
+      return rejectWithValue(error.toString());
+    }
+  }
+);
+
 export const fetchActiveList = createAsyncThunk(
   "lists/fetchActiveList",
   async ({ userId, listId }, { rejectWithValue }) => {
     try {
       const listData = await fetchListWithItems(userId, listId);
-      
+
       // Convert Firestore Timestamps to serializable format before returning
       if (listData && listData.items && Array.isArray(listData.items)) {
-        listData.items = listData.items.map(item => {
+        listData.items = listData.items.map((item) => {
           // Create a copy of the item to avoid mutating the original
           const processedItem = { ...item };
-          
+
           // Convert dateAdded Timestamp to ISO string if it exists
-          if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
-            processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+          if (
+            processedItem.dateAdded &&
+            typeof processedItem.dateAdded.toDate === "function"
+          ) {
+            processedItem.dateAdded = processedItem.dateAdded
+              .toDate()
+              .toISOString();
           }
-          
+
           // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
-          if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
-            processedItem.release_date = processedItem.release_date.toDate().toISOString();
+          if (
+            processedItem.release_date &&
+            typeof processedItem.release_date.toDate === "function"
+          ) {
+            processedItem.release_date = processedItem.release_date
+              .toDate()
+              .toISOString();
           }
-          
+
           // Convert any other Timestamp fields if they exist
-          if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
-            processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+          if (
+            processedItem.createdAt &&
+            typeof processedItem.createdAt.toDate === "function"
+          ) {
+            processedItem.createdAt = processedItem.createdAt
+              .toDate()
+              .toISOString();
           }
-          
+
           return processedItem;
         });
       }
-      
+
       // Also convert list-level Timestamps
-      if (listData && listData.createdAt && typeof listData.createdAt.toDate === 'function') {
+      if (
+        listData &&
+        listData.createdAt &&
+        typeof listData.createdAt.toDate === "function"
+      ) {
         listData.createdAt = listData.createdAt.toDate().toISOString();
       }
-      
+
       return listData;
     } catch (error) {
       return rejectWithValue(error.toString());
@@ -205,103 +302,19 @@ export const fetchActiveList = createAsyncThunk(
 const listsSlice = createSlice({
   name: "lists",
   initialState: {
-    watchlist: { items: [], status: "idle", error: null },
-    customLists: { lists: [], status: "idle", error: null }, // To hold all of the user's lists
-    activeList: { details: null, items: [], status: "idle", error: null } // For the currently viewed list
+    customLists: { lists: [], status: "idle", error: null }, // All user's lists (replaces watchlist)
+    activeList: { details: null, items: [], status: "idle", error: null }, // For the currently viewed list
   },
   reducers: {},
   extraReducers: (builder) => {
     builder
-      // Fetch Watchlist
-      .addCase(fetchWatchlist.pending, (state) => {
-        state.watchlist.status = "loading";
-      })
-      .addCase(fetchWatchlist.fulfilled, (state, action) => {
-        state.watchlist.status = "succeeded";
-        // Convert any Timestamps in the items to serializable format
-        state.watchlist.items = (action.payload || []).map(item => {
-          // Create a copy of the item to avoid mutating the original
-          const processedItem = { ...item };
-          
-          // Convert dateAdded Timestamp to ISO string if it exists
-          if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
-            processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
-          }
-          
-          // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
-          if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
-            processedItem.release_date = processedItem.release_date.toDate().toISOString();
-          }
-          
-          // Convert any other Timestamp fields if they exist
-          if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
-            processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
-          }
-          
-          return processedItem;
-        });
-      })
-      .addCase(fetchWatchlist.rejected, (state, action) => {
-        state.watchlist.status = "failed";
-        state.watchlist.error = action.payload;
-      })
-      // Remove Item from Watchlist
-      .addCase(removeItemFromWatchlist.pending, (state) => {
-        state.watchlist.status = "loading";
-      })
-      .addCase(removeItemFromWatchlist.fulfilled, (state, action) => {
-        state.watchlist.status = "succeeded";
-        state.watchlist.items = state.watchlist.items.filter(
-          (item) => item.id !== action.payload
-        );
-      })
-      .addCase(removeItemFromWatchlist.rejected, (state, action) => {
-        state.watchlist.status = "failed";
-        state.watchlist.error = action.payload;
-      })
       // Fetch Lists
       .addCase(fetchLists.pending, (state) => {
         state.customLists.status = "loading";
       })
       .addCase(fetchLists.fulfilled, (state, action) => {
         state.customLists.status = "succeeded";
-        // Convert Firestore Timestamps to serializable format
-        state.customLists.lists = action.payload.map(list => {
-          // Process the list details
-          const processedList = { ...list };
-          
-          // If the list has a createdAt Timestamp, convert it to ISO string
-          if (processedList.createdAt && typeof processedList.createdAt.toDate === 'function') {
-            processedList.createdAt = processedList.createdAt.toDate().toISOString();
-          }
-          
-          // Process items in the list if they exist
-          if (processedList.items && Array.isArray(processedList.items)) {
-            processedList.items = processedList.items.map(item => {
-              // Create a copy of the item to avoid mutating the original
-              const processedItem = { ...item };
-              
-              // Convert dateAdded Timestamp to ISO string if it exists
-              if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
-                processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
-              }
-              
-              // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
-              if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
-                processedItem.release_date = processedItem.release_date.toDate().toISOString();
-              }
-              
-              // Convert any other Timestamp fields if they exist
-              if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
-                processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
-              }
-              
-              return processedItem;
-            });
-          }
-          
-          return processedList;
-        });
+        state.customLists.lists = action.payload;
       })
       .addCase(fetchLists.rejected, (state, action) => {
         state.customLists.status = "failed";
@@ -314,6 +327,15 @@ const listsSlice = createSlice({
       .addCase(createList.fulfilled, (state, action) => {
         state.customLists.status = "succeeded";
         state.customLists.lists.push(action.payload);
+        // Re-sort lists to ensure pinned lists appear at the top
+        state.customLists.lists.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          if (a.isPinned && b.isPinned) {
+            return new Date(b.pinnedAt) - new Date(a.pinnedAt);
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
       })
       .addCase(createList.rejected, (state, action) => {
         state.customLists.status = "failed";
@@ -340,7 +362,10 @@ const listsSlice = createSlice({
       .addCase(addItem.fulfilled, (state, action) => {
         state.activeList.status = "succeeded";
         // Only update the active list if it's the same list
-        if (state.activeList.details && state.activeList.details.id === action.payload.listId) {
+        if (
+          state.activeList.details &&
+          state.activeList.details.id === action.payload.listId
+        ) {
           state.activeList.items.push(action.payload.item);
         }
       })
@@ -355,13 +380,34 @@ const listsSlice = createSlice({
       .addCase(removeItem.fulfilled, (state, action) => {
         state.activeList.status = "succeeded";
         // Only update the active list if it's the same list
-        if (state.activeList.details && state.activeList.details.id === action.payload.listId) {
+        if (
+          state.activeList.details &&
+          state.activeList.details.id === action.payload.listId
+        ) {
           state.activeList.items = state.activeList.items.filter(
             (item) => item.id !== action.payload.mediaId
           );
         }
       })
       .addCase(removeItem.rejected, (state, action) => {
+        state.activeList.status = "failed";
+        state.activeList.error = action.payload;
+      })
+      // Add Items Batch
+      .addCase(addItemsBatch.pending, (state) => {
+        state.activeList.status = "loading";
+      })
+      .addCase(addItemsBatch.fulfilled, (state, action) => {
+        state.activeList.status = "succeeded";
+        // Only update the active list if it's the same list
+        if (
+          state.activeList.details &&
+          state.activeList.details.id === action.payload.listId
+        ) {
+          state.activeList.items.push(...action.payload.items);
+        }
+      })
+      .addCase(addItemsBatch.rejected, (state, action) => {
         state.activeList.status = "failed";
         state.activeList.error = action.payload;
       })
@@ -373,31 +419,49 @@ const listsSlice = createSlice({
         state.activeList.status = "succeeded";
         // Convert any Timestamps in the list details to serializable format
         const listDetails = action.payload;
-        if (listDetails.createdAt && typeof listDetails.createdAt.toDate === 'function') {
+        if (
+          listDetails.createdAt &&
+          typeof listDetails.createdAt.toDate === "function"
+        ) {
           listDetails.createdAt = listDetails.createdAt.toDate().toISOString();
         }
-        
+
         state.activeList.details = listDetails;
         // Convert any Timestamps in the items to serializable format
-        state.activeList.items = (action.payload.items || []).map(item => {
+        state.activeList.items = (action.payload.items || []).map((item) => {
           // Create a copy of the item to avoid mutating the original
           const processedItem = { ...item };
-          
+
           // Convert dateAdded Timestamp to ISO string if it exists
-          if (processedItem.dateAdded && typeof processedItem.dateAdded.toDate === 'function') {
-            processedItem.dateAdded = processedItem.dateAdded.toDate().toISOString();
+          if (
+            processedItem.dateAdded &&
+            typeof processedItem.dateAdded.toDate === "function"
+          ) {
+            processedItem.dateAdded = processedItem.dateAdded
+              .toDate()
+              .toISOString();
           }
-          
+
           // Convert release_date Timestamp to ISO string if it exists (though this is typically already a string)
-          if (processedItem.release_date && typeof processedItem.release_date.toDate === 'function') {
-            processedItem.release_date = processedItem.release_date.toDate().toISOString();
+          if (
+            processedItem.release_date &&
+            typeof processedItem.release_date.toDate === "function"
+          ) {
+            processedItem.release_date = processedItem.release_date
+              .toDate()
+              .toISOString();
           }
-          
+
           // Convert any other Timestamp fields if they exist
-          if (processedItem.createdAt && typeof processedItem.createdAt.toDate === 'function') {
-            processedItem.createdAt = processedItem.createdAt.toDate().toISOString();
+          if (
+            processedItem.createdAt &&
+            typeof processedItem.createdAt.toDate === "function"
+          ) {
+            processedItem.createdAt = processedItem.createdAt
+              .toDate()
+              .toISOString();
           }
-          
+
           return processedItem;
         });
         state.activeList.error = null;
@@ -405,6 +469,49 @@ const listsSlice = createSlice({
       .addCase(fetchActiveList.rejected, (state, action) => {
         state.activeList.status = "failed";
         state.activeList.error = action.payload;
+      })
+      // Pin List
+      .addCase(pinListThunk.fulfilled, (state, action) => {
+        const { listId, pinnedAt } = action.payload;
+        const list = state.customLists.lists.find((l) => l.id === listId);
+        if (list) {
+          list.isPinned = true;
+          list.pinnedAt = pinnedAt;
+        }
+        // Re-sort lists to move pinned to top
+        state.customLists.lists.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          if (a.isPinned && b.isPinned) {
+            return new Date(b.pinnedAt) - new Date(a.pinnedAt);
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      })
+      .addCase(pinListThunk.rejected, (state, action) => {
+        state.customLists.error = action.payload;
+      })
+      // Unpin List
+      .addCase(unpinListThunk.fulfilled, (state, action) => {
+        const listId = action.payload;
+        const list = state.customLists.lists.find((l) => l.id === listId);
+        if (list) {
+          list.isPinned = false;
+          list.pinnedAt = null;
+        }
+        // Re-sort lists
+        state.customLists.lists.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          if (a.isPinned && b.isPinned) {
+            return new Date(b.pinnedAt) - new Date(a.pinnedAt);
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      })
+      // Create Default List
+      .addCase(createDefaultList.fulfilled, (state, action) => {
+        state.customLists.lists.unshift(action.payload);
       });
   },
 });

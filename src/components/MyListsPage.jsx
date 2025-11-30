@@ -1,30 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { fetchLists, fetchWatchlist, deleteList } from '../util/listsSlice';
-import useRequireAuth from '../hooks/useRequireAuth';
-import MovieCard from './MovieCard';
-import Header from './Header';
-import Footer from './Footer';
-import CreateListModal from './CreateListModal';
-import ConfirmationModal from './ConfirmationModal';
-import { exportListCsv } from '../util/exportDownload';
+import React, { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { fetchLists, deleteList, pinListThunk, unpinListThunk, createDefaultList } from "../util/listsSlice";
+import useRequireAuth from "../hooks/useRequireAuth";
+import ShelfCard from "./ShelfCard";
+import BookshelfListCard from "./BookshelfListCard";
+import Header from "./Header";
+import CreateListModal from "./CreateListModal";
+import ConfirmationModal from "./ConfirmationModal";
+import { exportListCsv } from "../util/exportDownload";
 
 const MyListsPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const user = useRequireAuth();
-  const { watchlist, customLists } = useSelector((state) => state.lists);
+  const { customLists } = useSelector((state) => state.lists);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [listToDelete, setListToDelete] = useState(null);
   const [exportingListId, setExportingListId] = useState(null);
+  const [viewMode, setViewMode] = useState("bookshelf"); // 'grid' or 'bookshelf'
+  const [hasCheckedDefaultList, setHasCheckedDefaultList] = useState(false);
 
   useEffect(() => {
     if (user) {
-      dispatch(fetchWatchlist(user.uid));
       dispatch(fetchLists(user.uid));
     }
   }, [dispatch, user]);
+  
+  // Create default "Watch Later" list on first login
+  useEffect(() => {
+    if (user && customLists.status === 'succeeded' && !hasCheckedDefaultList) {
+      setHasCheckedDefaultList(true);
+      if (!customLists.lists || customLists.lists.length === 0) {
+        dispatch(createDefaultList(user.uid));
+      }
+    }
+  }, [user, customLists.status, customLists.lists, hasCheckedDefaultList, dispatch]);
 
   const handleExportList = async (listId, listName) => {
     setExportingListId(listId);
@@ -38,53 +49,104 @@ const MyListsPage = () => {
   const handleConfirmDelete = async () => {
     if (user && listToDelete) {
       try {
-        await dispatch(deleteList({ 
-          userId: user.uid, 
-          listId: listToDelete.id 
-        })).unwrap();
+        await dispatch(
+          deleteList({
+            userId: user.uid,
+            listId: listToDelete.id,
+          })
+        ).unwrap();
         setListToDelete(null);
       } catch (err) {
-        console.error('Failed to delete list:', err);
+        console.error("Failed to delete list:", err);
       }
     }
   };
+  
+  const handleTogglePin = async (listId, currentlyPinned) => {
+    if (!user) return;
+    try {
+      if (currentlyPinned) {
+        await dispatch(unpinListThunk({ userId: user.uid, listId })).unwrap();
+      } else {
+        await dispatch(pinListThunk({ userId: user.uid, listId })).unwrap();
+      }
+    } catch (err) {
+      alert(err || "Failed to update pin status");
+    }
+  };
 
-  const loading = watchlist.status === 'loading' || customLists.status === 'loading';
-  const error = watchlist.error || customLists.error;
+  const loading = customLists.status === "loading";
+  const error = customLists.error;
 
   return (
     <div className="min-h-screen premium-page flex flex-col">
       <Header />
-      
+
       {/* Hero Section */}
-      <div className="pt-24 pb-12 px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto">
+      <div className="pt-24 pb-12 px-10">
+        <div className="max-w-full mx-auto">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div>
               <div className="flex items-center gap-4 mb-4">
                 <div className="glass-effect p-4 rounded-full">
                   <span className="material-symbols-outlined text-5xl gradient-accent">
-                    playlist_play
+                    collections_bookmark
                   </span>
                 </div>
                 <h1 className="font-display text-5xl lg:text-6xl font-bold gradient-text">
-                  My Lists
+                  My Collections
                 </h1>
               </div>
               <p className="text-white/60 font-secondary text-lg">
                 Manage your watchlists and custom collections
               </p>
             </div>
-            
+
             <div className="flex flex-wrap gap-3">
-              <button 
-                onClick={() => navigate('/import')}
+              {/* View Mode Toggle */}
+              <div className="glass-effect rounded-xl p-1 flex gap-1">
+                <button
+                  onClick={() => setViewMode("bookshelf")}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                    viewMode === "bookshelf"
+                      ? "bg-red-600 text-white"
+                      : "text-white/60 hover:text-white hover:bg-white/10"
+                  }`}
+                  aria-label="Bookshelf view"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    view_agenda
+                  </span>
+                  <span className="font-secondary text-sm hidden sm:inline">
+                    Wide
+                  </span>
+                </button>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                    viewMode === "grid"
+                      ? "bg-red-600 text-white"
+                      : "text-white/60 hover:text-white hover:bg-white/10"
+                  }`}
+                  aria-label="Grid view"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    grid_view
+                  </span>
+                  <span className="font-secondary text-sm hidden sm:inline">
+                    Grid
+                  </span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => navigate("/import")}
                 className="btn-secondary flex items-center gap-2"
               >
                 <span className="material-symbols-outlined">upload</span>
                 <span>Import CSV</span>
               </button>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(true)}
                 className="btn-primary flex items-center gap-2"
               >
@@ -97,15 +159,17 @@ const MyListsPage = () => {
       </div>
 
       {/* Content */}
-      <main className="flex-grow w-full px-6 lg:px-12 pb-20">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-grow w-full px-10 pb-20">
+        <div className="max-w-full mx-auto">
           {loading && (
             <div className="text-center py-20">
               <div className="animate-spin rounded-full h-16 w-16 border-4 border-white/20 border-t-red-600 mx-auto mb-4"></div>
-              <p className="text-white/60 font-secondary">Loading your lists...</p>
+              <p className="text-white/60 font-secondary">
+                Loading your lists...
+              </p>
             </div>
           )}
-          
+
           {error && (
             <div className="glass-effect rounded-2xl p-8 text-center">
               <span className="material-symbols-outlined text-6xl text-red-400 mb-4">
@@ -116,153 +180,72 @@ const MyListsPage = () => {
           )}
 
           {!loading && !error && (
-            <div className="space-y-12">
-              {/* Watchlist Section */}
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-3xl font-bold font-display text-white flex items-center gap-3">
-                    <span className="material-symbols-outlined text-4xl text-red-600">
-                      bookmark
-                    </span>
-                    Watchlist
-                  </h2>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleExportList('watchlist', 'Watchlist')}
-                      disabled={exportingListId === 'watchlist'}
-                      className={`glass-effect px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all ${
-                        exportingListId === 'watchlist'
-                          ? 'opacity-50 cursor-not-allowed'
-                          : 'hover:bg-white/20'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-lg">download</span>
-                      <span className="text-white font-secondary">Export</span>
-                    </button>
-                    <button 
-                      onClick={() => navigate('/my-list')}
-                      className="glass-effect hover:bg-white/20 px-4 py-2 rounded-xl text-sm flex items-center gap-2 transition-all"
-                    >
-                      <span className="material-symbols-outlined text-lg">open_in_new</span>
-                      <span className="text-white font-secondary">Open</span>
-                    </button>
-                  </div>
+            <div>
+              {/* My Collections Header */}
+              <h2 className="text-3xl font-bold font-display text-white mb-6 flex items-center gap-3">
+                <span className="material-symbols-outlined text-4xl text-red-600">
+                  {viewMode === "bookshelf"
+                    ? "shelves"
+                    : "collections_bookmark"}
+                </span>
+                {viewMode === "bookshelf"
+                  ? "Library Shelves"
+                  : "Collection Grid"}
+              </h2>
+
+              {/* Unified Grid/List: All Custom Lists (sorted by pin status) */}
+              {customLists.lists.length > 0 ? (
+                <div
+                  className={
+                    viewMode === "grid"
+                      ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-8 pb-8"
+                      : "flex flex-col gap-6"
+                  }
+                >
+                  {/* All Lists (pinned appear first due to sorting in Redux) */}
+                  {customLists.lists.map((list) =>
+                    viewMode === "grid" ? (
+                      <ShelfCard
+                        key={list.id}
+                        list={list}
+                        onDelete={setListToDelete}
+                        onExport={handleExportList}
+                        onTogglePin={handleTogglePin}
+                        isExporting={exportingListId === list.id}
+                      />
+                    ) : (
+                      <BookshelfListCard
+                        key={list.id}
+                        list={list}
+                        onDelete={setListToDelete}
+                        onExport={handleExportList}
+                        onTogglePin={handleTogglePin}
+                        isExporting={exportingListId === list.id}
+                      />
+                    )
+                  )}
                 </div>
-                
-                {watchlist.items && watchlist.items.length > 0 ? (
-                  <div className="flex overflow-x-scroll scrollbar-hide gap-4 pb-4">
-                    {watchlist.items.map((item) => (
-                      <MovieCard key={item.id} movie={item} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="glass-effect rounded-2xl p-12 text-center">
-                    <span className="material-symbols-outlined text-7xl text-white/20 mb-4">
-                      playlist_add
-                    </span>
-                    <p className="text-white/60 font-secondary">
-                      Your watchlist is empty. Start adding movies and shows!
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Custom Lists Section */}
-              <div>
-                <h2 className="text-3xl font-bold font-display text-white mb-6 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-4xl text-red-600">
-                    library_books
+              ) : (
+                <div className="glass-effect rounded-2xl p-12 text-center">
+                  <span className="material-symbols-outlined text-7xl text-white/20 mb-4">
+                    collections_bookmark
                   </span>
-                  Custom Lists
-                </h2>
-
-                {customLists.lists.length === 0 ? (
-                  <div className="glass-effect rounded-2xl p-12 text-center">
-                    <span className="material-symbols-outlined text-7xl text-white/20 mb-4">
-                      list_alt
-                    </span>
-                    <p className="text-white/60 font-secondary mb-4">
-                      You don't have any custom lists yet.
-                    </p>
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="btn-primary"
-                    >
-                      <span className="material-symbols-outlined">add</span>
-                      <span>Create Your First List</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-8">
-                    {customLists.lists.map((list) => (
-                      <div key={list.id} className="glass-effect rounded-2xl p-6">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                          <div>
-                            <h3 className="text-2xl font-bold text-white font-secondary mb-1">
-                              {list.name}
-                            </h3>
-                            <p className="text-white/60 text-sm">
-                              {list.items?.length || 0} {list.items?.length === 1 ? 'item' : 'items'}
-                            </p>
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => handleExportList(list.id, list.name)}
-                              disabled={exportingListId === list.id}
-                              className={`glass-effect px-3 py-2 rounded-xl text-sm flex items-center gap-2 transition-all ${
-                                exportingListId === list.id
-                                  ? 'opacity-50 cursor-not-allowed'
-                                  : 'hover:bg-white/20'
-                              }`}
-                            >
-                              <span className="material-symbols-outlined text-base">download</span>
-                              <span className="text-white font-secondary">Export</span>
-                            </button>
-                            <button 
-                              onClick={() => navigate(`/my-lists/${list.id}`)}
-                              className="glass-effect hover:bg-white/20 px-3 py-2 rounded-xl text-sm flex items-center gap-2 transition-all"
-                            >
-                              <span className="material-symbols-outlined text-base">open_in_new</span>
-                              <span className="text-white font-secondary">Open</span>
-                            </button>
-                            <button 
-                              onClick={() => setListToDelete(list)}
-                              className="bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 px-3 py-2 rounded-xl text-sm flex items-center gap-2 transition-all"
-                            >
-                              <span className="material-symbols-outlined text-base text-red-400">delete</span>
-                              <span className="text-red-400 font-secondary">Delete</span>
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {list.items && list.items.length > 0 ? (
-                          <div className="flex overflow-x-scroll scrollbar-hide gap-4 pb-4">
-                            {list.items.map((item) => (
-                              <MovieCard key={item.id} movie={item} />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <span className="material-symbols-outlined text-5xl text-white/20 mb-2">
-                              movie_off
-                            </span>
-                            <p className="text-white/40 text-sm font-secondary">
-                              This list is empty
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  <p className="text-white/60 font-secondary mb-4">
+                    Your library is empty. Start creating collections!
+                  </p>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="btn-primary"
+                  >
+                    <span className="material-symbols-outlined">add</span>
+                    <span>Create Your First Collection</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </main>
-
-      <Footer />
 
       <ConfirmationModal
         isOpen={!!listToDelete}
@@ -271,7 +254,7 @@ const MyListsPage = () => {
         title="Delete List"
         message={`Are you sure you want to permanently delete the list '${listToDelete?.name}'?`}
       />
-      
+
       <CreateListModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

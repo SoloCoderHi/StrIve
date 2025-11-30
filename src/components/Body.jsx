@@ -9,15 +9,18 @@ import TVShowDetails from "./TVShowDetails";
 import TVShowDetailsPage from "./TVShowDetailsPage";
 import SearchPage from "./SearchPage";
 import ProtectedRoute from "./ProtectedRoute";
-import MyListPage from "./MyListPage"; // Import MyListPage
 import MyListsPage from "./MyListsPage"; // Import MyListsPage
 import ListDetailsPage from "./ListDetailsPage"; // Import ListDetailsPage
 import ImportPage from "./ImportPage"; // Import ImportPage
 import ImportReviewPage from "./ImportReviewPage"; // Import ImportReviewPage
+import { SimklPage, SimklCallback } from "./Simkl";
+import { useSimklBackgroundSync } from "../hooks/useSimkl";
 import { RouterProvider } from "react-router-dom";
 import Footer from "./Footer";
 
 const Body = () => {
+  useSimklBackgroundSync(); // Enable background sync globally
+
   const appRouter = createBrowserRouter([
     {
       path: "/",
@@ -52,15 +55,7 @@ const Body = () => {
       ),
     },
     {
-      path: "/my-list", // Add new route for My List
-      element: (
-        <ProtectedRoute>
-          <MyListPage />
-        </ProtectedRoute>
-      ),
-    },
-    {
-      path: "/my-lists", // Add new route for My Lists
+      path: "/my-lists", // User's collections page
       element: (
         <ProtectedRoute>
           <MyListsPage />
@@ -68,7 +63,7 @@ const Body = () => {
       ),
     },
     {
-      path: "/my-lists/:listId", // Add new route for individual list details
+      path: "/my-lists/:listId", // Individual list details
       element: (
         <ProtectedRoute>
           <ListDetailsPage />
@@ -90,6 +85,18 @@ const Body = () => {
           <ImportReviewPage />
         </ProtectedRoute>
       ),
+    },
+    {
+      path: "/simkl",
+      element: (
+        <ProtectedRoute>
+          <SimklPage />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/simkl/callback",
+      element: <SimklCallback />,
     },
     {
       path: "/movie/:movieId",

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { ArrowLeft, Play, Plus, Star, ExternalLink, Check } from "lucide-react";
 import Header from "./Header";
 import useTvShowDetails from "../hooks/useTvShowDetails";
@@ -8,7 +8,7 @@ import useTvSeasonEpisodes from "../hooks/useTvSeasonEpisodes";
 import useTvVideos from "../hooks/useTvVideos";
 import useRequireAuth from "../hooks/useRequireAuth";
 import useImdbTitle from "../hooks/useImdbTitle";
-import { addToList } from "../util/firestoreService";
+import { addItem, fetchLists } from "../util/listsSlice";
 import { options } from "../util/constants";
 import EpisodeOverlay from "./EpisodeOverlay";
 import SeasonTabs from "./SeasonTabs";
@@ -18,6 +18,8 @@ import EpisodeListItem from "./TVShowDetails/EpisodeListItem";
 import EpisodeCard from "./TVShowDetails/EpisodeCard";
 import SimilarShowsPanel from "./TVShowDetails/SimilarShowsPanel";
 import EpisodeMatrixView from "./TVShowDetails/EpisodeMatrixView";
+import CreateListModal from "./CreateListModal";
+import AddToListPopover from "./AddToListPopover";
 
 const IMG_CDN_URL = "https://image.tmdb.org/t/p";
 
@@ -25,6 +27,8 @@ const TVShowDetailsPage = () => {
   const { tvId } = useParams();
   const navigate = useNavigate();
   const user = useRequireAuth();
+  const dispatch = useDispatch();
+  const popoverRef = useRef(null);
 
   const { data: showDetails, loading: detailsLoading, error: detailsError } = useTvShowDetails(tvId);
   const { data: videos } = useTvVideos(tvId);
@@ -33,11 +37,15 @@ const TVShowDetailsPage = () => {
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [showEpisodeOverlay, setShowEpisodeOverlay] = useState(false);
-  const [isInWatchlist, setIsInWatchlist] = useState(false);
-  const [addingToWatchlist, setAddingToWatchlist] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [allSeasonsData, setAllSeasonsData] = useState(null);
   const [isLoadingMatrix, setIsLoadingMatrix] = useState(false);
+  const [showPopover, setShowPopover] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [hoverTimeout, setHoverTimeout] = useState(null);
+
+  // Get lists from Redux
+  const { customLists } = useSelector((state) => state.lists);
 
   const { data: seasonData, loading: episodesLoading } = useTvSeasonEpisodes(
     tvId,
@@ -102,32 +110,59 @@ const TVShowDetailsPage = () => {
     setShowEpisodeOverlay(true);
   };
 
-  const handleAddToWatchlist = async () => {
-    if (!user) {
-      alert("Please log in to add shows to your watchlist.");
-      return;
+  // Fetch user's lists on mount
+  useEffect(() => {
+    if (user) {
+      dispatch(fetchLists(user.uid));
     }
+  }, [dispatch, user]);
+
+  // Close popover when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+        setShowPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+    };
+  }, [hoverTimeout]);
+
+  const handleAddToList = async (listId) => {
+    if (!user || !showDetails) return;
 
     try {
-      setAddingToWatchlist(true);
       const mediaItem = {
-        id: tvId,
-        title: showDetails?.name || "TV Show",
-        poster_path: showDetails?.posterPath,
-        overview: showDetails?.overview,
-        first_air_date: showDetails?.firstAirDate,
-        vote_average: showDetails?.voteAverage,
-        type: "tv",
+        id: parseInt(tvId),
+        name: showDetails.name,
+        title: showDetails.name,
+        poster_path: showDetails.posterPath,
+        first_air_date: showDetails.firstAirDate,
+        vote_average: showDetails.voteAverage,
+        vote_count: showDetails.voteCount,
+        media_type: "tv",
       };
 
-      await addToList(user.uid, "watchlist", mediaItem);
-      setIsInWatchlist(true);
+      await dispatch(addItem({ userId: user.uid, listId, mediaItem })).unwrap();
+      alert(`${mediaItem.title} added to your list!`);
+
+      setShowPopover(false);
     } catch (error) {
-      console.error("Error adding to watchlist:", error);
-      alert("Failed to add to watchlist. Please try again.");
-    } finally {
-      setAddingToWatchlist(false);
+      console.error("Error adding to list:", error);
+      alert("Failed to add to list. Please try again.");
     }
+  };
+
+  const handleCreateNew = () => {
+    setShowPopover(false);
+    setShowCreateModal(true);
   };
 
   if (detailsLoading) {
@@ -182,7 +217,7 @@ const TVShowDetailsPage = () => {
   }
 
   return (
-    <>
+    <div className="min-h-screen premium-page pt-20">
       <Header />
       <div className="amoled-page">
         {/* Hero Section with Backdrop */}
@@ -331,15 +366,49 @@ const TVShowDetailsPage = () => {
                     </a>
                   )}
 
-                  <button
-                    onClick={handleAddToWatchlist}
-                    disabled={addingToWatchlist || isInWatchlist}
-                    className="flex items-center gap-2 px-8 py-4 rounded font-semibold text-lg transition-all focus-accent disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                    style={{ backgroundColor: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)' }}
+                  {/* Add to List Button with Hover Popover */}
+                  <div 
+                    ref={popoverRef}
+                    className="relative"
+                    onMouseEnter={() => {
+                      if (hoverTimeout) clearTimeout(hoverTimeout);
+                      const timeout = setTimeout(() => setShowPopover(true), 500);
+                      setHoverTimeout(timeout);
+                    }}
+                    onMouseLeave={() => {
+                      if (hoverTimeout) clearTimeout(hoverTimeout);
+                      const timeout = setTimeout(() => setShowPopover(false), 300);
+                      setHoverTimeout(timeout);
+                    }}
                   >
-                    {isInWatchlist ? <Check className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
-                    {isInWatchlist ? 'In Watchlist' : 'Watch Later'}
-                  </button>
+                    <button
+                      className="flex items-center gap-2 px-8 py-4 rounded font-semibold text-lg transition-all focus-accent cursor-pointer"
+                      style={{ backgroundColor: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)' }}
+                    >
+                      <Plus className="w-6 h-6" />
+                      Add to List
+                    </button>
+
+                    {/* Dropdown Popover */}
+                    {showPopover && (
+                      <div
+                        onMouseEnter={() => {
+                          if (hoverTimeout) clearTimeout(hoverTimeout);
+                        }}
+                        onMouseLeave={() => {
+                          if (hoverTimeout) clearTimeout(hoverTimeout);
+                          const timeout = setTimeout(() => setShowPopover(false), 300);
+                          setHoverTimeout(timeout);
+                        }}
+                      >
+                        <AddToListPopover
+                          isOpen={showPopover}
+                          onSelectList={handleAddToList}
+                          onCreateNew={handleCreateNew}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Genres */}
@@ -514,7 +583,14 @@ const TVShowDetailsPage = () => {
           }}
         />
       )}
-    </>
+
+      {/* Create List Modal */}
+      <CreateListModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        userId={user?.uid}
+      />
+    </div>
   );
 };
 

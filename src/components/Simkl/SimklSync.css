@@ -1,0 +1,205 @@
+/* SIMKL Sync Component Styles */
+
+.simkl-sync {
+  padding: 1rem;
+  background: var(--background-secondary, #1a1a1a);
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.simkl-connect {
+  text-align: center;
+  padding: 2rem;
+}
+
+.simkl-logo {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 1rem;
+}
+
+.simkl-logo-small {
+  width: 40px;
+  height: 40px;
+  margin-right: 0.5rem;
+}
+
+.simkl-connect h3 {
+  margin: 1rem 0 0.5rem;
+  color: var(--text-primary, #ffffff);
+}
+
+.simkl-connect p {
+  color: var(--text-secondary, #b0b0b0);
+  margin-bottom: 1.5rem;
+}
+
+.btn-connect-simkl {
+  background: linear-gradient(135deg, #00d4ff, #0096ff);
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-connect-simkl:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 150, 255, 0.4);
+}
+
+.simkl-status {
+  padding: 1rem;
+}
+
+.simkl-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.simkl-user-info h4 {
+  margin: 0;
+  color: var(--text-primary, #ffffff);
+  font-size: 1.1rem;
+}
+
+.simkl-username {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary, #b0b0b0);
+  font-size: 0.9rem;
+}
+
+.simkl-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.simkl-actions button {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-sync {
+  background: var(--primary-color, #0096ff);
+  color: white;
+}
+
+.btn-sync:hover:not(:disabled) {
+  background: var(--primary-hover, #0080dd);
+}
+
+.btn-sync:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-stats {
+  background: var(--secondary-color, #6c757d);
+  color: white;
+}
+
+.btn-stats:hover {
+  background: #5a6268;
+}
+
+.btn-logout {
+  background: var(--danger-color, #dc3545);
+  color: white;
+  margin-left: auto;
+}
+
+.btn-logout:hover {
+  background: #c82333;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.sync-icon {
+  font-size: 1.1rem;
+}
+
+.simkl-stats {
+  background: var(--background-tertiary, #252525);
+  padding: 1rem;
+  border-radius: 6px;
+}
+
+.simkl-stats h5 {
+  margin: 0 0 1rem;
+  color: var(--text-primary, #ffffff);
+  font-size: 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.75rem;
+  background: var(--background-secondary, #1a1a1a);
+  border-radius: 6px;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #b0b0b0);
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-color, #0096ff);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .simkl-actions {
+    flex-direction: column;
+  }
+
+  .simkl-actions button {
+    width: 100%;
+  }
+
+  .btn-logout {
+    margin-left: 0;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

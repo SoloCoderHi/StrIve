@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useRequireAuth from '../hooks/useRequireAuth';
 import Header from './Header';
-import Footer from './Footer';
 import ImportMovieItem from './ImportMovieItem';
 import ManualSearchModal from './ManualSearchModal';
 import { getAuth } from 'firebase/auth';

@@ -4,7 +4,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import useRequireAuth from '../hooks/useRequireAuth';
 import { fetchLists } from '../util/listsSlice';
 import Header from './Header';
-import Footer from './Footer';
 import { getAuth } from 'firebase/auth';
 import { downloadTemplateCsv, getExpectedHeaders } from '../util/csvTemplate';
 import { Download, Upload, FileText } from 'lucide-react';
